@@ -51,3 +51,50 @@ export async function getDataStats() {
   `
   return result[0]
 }
+
+export async function getDataByTimeRange(
+  startDate: string,
+  endDate: string,
+  limit = 1000
+) {
+  const result = await sql`
+    SELECT * FROM onenet_data 
+    WHERE created_at BETWEEN ${startDate} AND ${endDate}
+    ORDER BY created_at DESC 
+    LIMIT ${limit}
+  `
+  return result
+}
+
+export async function getDataByDeviceAndTimeRange(
+  deviceId: string,
+  datastream: string,
+  startDate: string,
+  endDate: string,
+  limit = 500
+) {
+  const result = await sql`
+    SELECT * FROM onenet_data 
+    WHERE device_id = ${deviceId}
+      AND datastream_id = ${datastream}
+      AND created_at BETWEEN ${startDate} AND ${endDate}
+    ORDER BY created_at ASC 
+    LIMIT ${limit}
+  `
+  return result
+}
+
+export async function getDevicesWithDatastreams() {
+  const result = await sql`
+    SELECT 
+      device_id,
+      raw_data->>'deviceName' as device_name,
+      array_agg(DISTINCT datastream_id) as datastreams,
+      COUNT(*) as total_records,
+      MAX(created_at) as latest_timestamp
+    FROM onenet_data 
+    GROUP BY device_id, raw_data->>'deviceName'
+    ORDER BY latest_timestamp DESC
+  `
+  return result
+}

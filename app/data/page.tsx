@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -95,10 +96,24 @@ export default function DataView() {
             <h1 className="text-3xl font-bold text-gray-900">OneNET 数据监控</h1>
             <p className="text-gray-600 mt-1">实时查看接收到的OneNET推送数据</p>
           </div>
-          <Button onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            刷新数据
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/analytics">
+              <Button variant="outline">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                数据分析
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button variant="outline">
+                <Activity className="w-4 h-4 mr-2" />
+                返回首页
+              </Button>
+            </Link>
+            <Button onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              刷新数据
+            </Button>
+          </div>
         </div>
 
         {/* 统计信息 */}

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Database, Wifi, Activity } from "lucide-react"
+import { RefreshCw, Database, Wifi, Activity, TrendingUp } from "lucide-react"
 
 interface OneNetDataItem {
   id: number
@@ -124,6 +124,12 @@ export default function OneNetDashboard() {
             <p className="text-gray-600 mt-1">实时监控来自OneNet平台的设备数据</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/analytics">
+              <Button variant="outline">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                数据分析
+              </Button>
+            </Link>
             <Link href="/data">
               <Button variant="outline">
                 <Database className="w-4 h-4 mr-2" />
