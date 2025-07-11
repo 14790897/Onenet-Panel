@@ -128,3 +128,80 @@ export function isDuplicateMessage(messageId?: string): boolean {
   
   return false
 }
+
+/**
+ * OneNET物模型推送消息的数据结构
+ */
+export interface OneNetThingModelMessage {
+  deviceId: string
+  deviceName: string
+  productId: string
+  messageType: 'notify' | 'response'
+  notifyType: 'property' | 'event' | 'service'
+  data: {
+    id: string
+    version: string
+    params?: {
+      [paramName: string]: {
+        value: any
+        time: number
+      }
+    }
+  }
+}
+
+/**
+ * 检查是否为OneNET物模型格式
+ */
+export function isThingModelMessage(data: any): data is OneNetThingModelMessage {
+  return !!(data.deviceId && data.messageType && data.notifyType && data.data)
+}
+
+/**
+ * 解析物模型参数数据
+ */
+export function parseThingModelParams(params: any): Array<{
+  name: string
+  value: any
+  numericValue: number
+  time: number
+  originalValue: any
+}> {
+  const result: Array<{
+    name: string
+    value: any
+    numericValue: number
+    time: number
+    originalValue: any
+  }> = []
+
+  if (!params || typeof params !== 'object') {
+    return result
+  }
+
+  for (const [paramName, paramData] of Object.entries(params)) {
+    if (paramData && typeof paramData === 'object') {
+      const param = paramData as any
+      let numericValue = 0
+
+      // 尝试转换为数字
+      if (typeof param.value === 'number') {
+        numericValue = param.value
+      } else if (typeof param.value === 'string' && !isNaN(Number(param.value))) {
+        numericValue = Number(param.value)
+      } else if (typeof param.value === 'boolean') {
+        numericValue = param.value ? 1 : 0
+      }
+
+      result.push({
+        name: paramName,
+        value: param.value,
+        numericValue,
+        time: param.time || Date.now(),
+        originalValue: param.value
+      })
+    }
+  }
+
+  return result
+}

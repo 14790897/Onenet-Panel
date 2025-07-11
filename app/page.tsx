@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -122,10 +123,24 @@ export default function OneNetDashboard() {
             <h1 className="text-3xl font-bold text-gray-900">OneNet 数据监控</h1>
             <p className="text-gray-600 mt-1">实时监控来自OneNet平台的设备数据</p>
           </div>
-          <Button onClick={fetchData} disabled={refreshing} className="flex items-center gap-2">
-            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            刷新数据
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/data">
+              <Button variant="outline">
+                <Database className="w-4 h-4 mr-2" />
+                数据查看
+              </Button>
+            </Link>
+            <Link href="/test-webhook">
+              <Button variant="outline">
+                <Activity className="w-4 h-4 mr-2" />
+                测试工具
+              </Button>
+            </Link>
+            <Button onClick={fetchData} disabled={refreshing} className="flex items-center gap-2">
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              刷新数据
+            </Button>
+          </div>
         </div>
 
         {/* 在统计卡片前添加数据库初始化提示 */}

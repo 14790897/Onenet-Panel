@@ -1,0 +1,297 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RefreshCw, Database, TrendingUp, Activity } from "lucide-react"
+
+interface OneNetDataRecord {
+  id: number
+  device_id: string
+  datastream_id: string
+  value: number
+  raw_data: any
+  created_at: string
+}
+
+export default function DataView() {
+  const [data, setData] = useState<OneNetDataRecord[]>([])
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [selectedDevice, setSelectedDevice] = useState<string>("")
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/data')
+      if (response.ok) {
+        const result = await response.json()
+        setData(result)
+      }
+    } catch (error) {
+      console.error('获取数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/data/stats')
+      if (response.ok) {
+        const result = await response.json()
+        setStats(result)
+      }
+    } catch (error) {
+      console.error('获取统计失败:', error)
+    }
+  }
+
+  const fetchDeviceData = async (deviceId: string) => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/data/device/${deviceId}`)
+      if (response.ok) {
+        const result = await response.json()
+        setData(result)
+      }
+    } catch (error) {
+      console.error('获取设备数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+    fetchStats()
+  }, [])
+
+  const uniqueDevices = Array.from(new Set(data.map(item => item.device_id)))
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('zh-CN')
+  }
+
+  const formatRawData = (rawData: any) => {
+    if (!rawData) return 'N/A'
+    
+    // 显示重要信息
+    const info = []
+    if (rawData.deviceName) info.push(`设备名: ${rawData.deviceName}`)
+    if (rawData.messageType) info.push(`消息类型: ${rawData.messageType}`)
+    if (rawData.originalValue !== undefined) info.push(`原始值: ${rawData.originalValue}`)
+    
+    return info.length > 0 ? info.join(', ') : JSON.stringify(rawData).substring(0, 100) + '...'
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">OneNET 数据监控</h1>
+            <p className="text-gray-600 mt-1">实时查看接收到的OneNET推送数据</p>
+          </div>
+          <Button onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            刷新数据
+          </Button>
+        </div>
+
+        {/* 统计信息 */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Database className="h-8 w-8 text-blue-600" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">总记录数</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.total_records}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Activity className="h-8 w-8 text-green-600" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">设备数量</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.unique_devices}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <TrendingUp className="h-8 w-8 text-purple-600" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">数据流数量</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.unique_datastreams}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <RefreshCw className="h-8 w-8 text-orange-600" />
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">最新数据</p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {stats.latest_timestamp ? formatTimestamp(stats.latest_timestamp) : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList>
+            <TabsTrigger value="all">所有数据</TabsTrigger>
+            <TabsTrigger value="device">按设备查看</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>最新数据记录</CardTitle>
+                <CardDescription>
+                  显示最近接收到的OneNET推送数据 (最多50条)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {data.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>暂无数据记录</p>
+                    <p className="text-sm">请确保OneNET推送服务已正确配置</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">设备ID</th>
+                          <th className="text-left p-2">数据流ID</th>
+                          <th className="text-left p-2">数值</th>
+                          <th className="text-left p-2">额外信息</th>
+                          <th className="text-left p-2">接收时间</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.map((record) => (
+                          <tr key={record.id} className="border-b hover:bg-gray-50">
+                            <td className="p-2">
+                              <Badge variant="outline">{record.device_id}</Badge>
+                            </td>
+                            <td className="p-2">
+                              <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                                {record.datastream_id}
+                              </code>
+                            </td>
+                            <td className="p-2 font-mono">{record.value}</td>
+                            <td className="p-2 text-sm text-gray-600 max-w-xs">
+                              {formatRawData(record.raw_data)}
+                            </td>
+                            <td className="p-2 text-sm">
+                              {formatTimestamp(record.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="device" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>按设备查看数据</CardTitle>
+                <CardDescription>
+                  选择特定设备查看其数据记录
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Button
+                    variant={selectedDevice === "" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedDevice("")
+                      fetchData()
+                    }}
+                  >
+                    所有设备
+                  </Button>
+                  {uniqueDevices.map((deviceId) => (
+                    <Button
+                      key={deviceId}
+                      variant={selectedDevice === deviceId ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDevice(deviceId)
+                        fetchDeviceData(deviceId)
+                      }}
+                    >
+                      {deviceId}
+                    </Button>
+                  ))}
+                </div>
+
+                {data.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>该设备暂无数据记录</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {data.map((record) => (
+                      <div key={record.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge>{record.device_id}</Badge>
+                            <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                              {record.datastream_id}
+                            </code>
+                            <span className="font-mono text-lg">{record.value}</span>
+                          </div>
+                          <span className="text-sm text-gray-500">
+                            {formatTimestamp(record.created_at)}
+                          </span>
+                        </div>
+                        {record.raw_data && (
+                          <details className="text-sm">
+                            <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                              查看原始数据
+                            </summary>
+                            <pre className="mt-2 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                              {JSON.stringify(record.raw_data, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}

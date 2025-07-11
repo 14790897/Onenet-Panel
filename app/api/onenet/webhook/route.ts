@@ -4,7 +4,10 @@ import {
   verifyOneNetSignature,
   parseOneNetMessage,
   isDuplicateMessage,
+  isThingModelMessage,
+  parseThingModelParams,
   type OneNetPushMessage,
+  type OneNetThingModelMessage,
   ONENET_TOKEN,
   ONENET_AES_KEY
 } from "@/lib/onenet-utils"
@@ -133,8 +136,12 @@ export async function POST(request: NextRequest) {
  */
 async function processOneNetMessage(messageData: any, originalMessage: OneNetPushMessage) {
   try {
+    // 检查是否为OneNET物模型格式
+    if (isThingModelMessage(messageData)) {
+      await handleThingModelData(messageData, originalMessage)
+    }
     // 根据消息类型进行不同处理
-    if (messageData.type) {
+    else if (messageData.type) {
       switch (messageData.type) {
         case 'device_data':
           await handleDeviceData(messageData)
@@ -155,6 +162,82 @@ async function processOneNetMessage(messageData: any, originalMessage: OneNetPus
     }
   } catch (error) {
     console.error('消息处理失败:', error)
+  }
+}
+
+/**
+ * 处理OneNET物模型数据
+ */
+async function handleThingModelData(data: OneNetThingModelMessage, originalMessage: OneNetPushMessage) {
+  try {
+    const { deviceId, deviceName, productId, messageType, notifyType, data: thingData } = data
+    
+    console.log('处理物模型数据:', {
+      deviceId,
+      deviceName,
+      productId,
+      messageType,
+      notifyType,
+      dataId: thingData?.id
+    })
+
+    // 处理物模型属性数据
+    if (notifyType === 'property' && thingData?.params) {
+      const params = parseThingModelParams(thingData.params)
+      
+      for (const param of params) {
+        try {
+          await insertOneNetData({
+            device_id: deviceId,
+            datastream_id: param.name,
+            value: param.numericValue,
+            raw_data: {
+              deviceName,
+              productId,
+              messageType,
+              notifyType,
+              dataId: thingData.id,
+              version: thingData.version,
+              paramTime: param.time,
+              originalValue: param.originalValue,
+              originalMessage
+            },
+          })
+
+          console.log('物模型参数已存储:', {
+            deviceId,
+            deviceName,
+            paramName: param.name,
+            value: param.value,
+            numericValue: param.numericValue,
+            time: param.time
+          })
+        } catch (paramError) {
+          console.error(`处理参数 ${param.name} 失败:`, paramError)
+        }
+      }
+    }
+    // 处理其他类型的通知
+    else {
+      console.log('其他类型的物模型通知:', { messageType, notifyType })
+      
+      // 作为通用数据存储
+      await insertOneNetData({
+        device_id: deviceId,
+        datastream_id: `${messageType}_${notifyType}`,
+        value: 1, // 事件类型数据设为1
+        raw_data: {
+          deviceName,
+          productId,
+          messageType,
+          notifyType,
+          data: thingData,
+          originalMessage
+        },
+      })
+    }
+  } catch (error) {
+    console.error('处理物模型数据失败:', error)
   }
 }
 
@@ -208,7 +291,35 @@ async function handleGenericData(data: any, originalMessage: OneNetPushMessage) 
       })
       console.log('通用数据已存储:', { device_id, datastream_id, value })
     } else {
-      console.log('数据格式不匹配，记录原始消息:', data)
+      console.log('数据格式不匹配，记录原始消息:', {
+        hasDeviceId: !!data.deviceId,
+        hasDeviceIdOld: !!data.device_id,
+        hasMessageType: !!data.messageType,
+        hasData: !!data.data,
+        keys: Object.keys(data),
+        summary: {
+          deviceId: data.deviceId,
+          deviceName: data.deviceName,
+          messageType: data.messageType,
+          notifyType: data.notifyType,
+        }
+      })
+      
+      // 即使格式不匹配也尝试存储一条记录作为日志
+      try {
+        const deviceId = data.deviceId || data.device_id || 'unknown'
+        const messageType = data.messageType || 'unknown'
+        
+        await insertOneNetData({
+          device_id: String(deviceId),
+          datastream_id: `raw_${messageType}`,
+          value: 0,
+          raw_data: { ...data, originalMessage, note: 'unrecognized_format' },
+        })
+        console.log('原始数据已存储为日志记录')
+      } catch (logError) {
+        console.error('存储日志记录失败:', logError)
+      }
     }
   } catch (error) {
     console.error('通用数据处理失败:', error)

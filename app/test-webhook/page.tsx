@@ -19,9 +19,9 @@ export default function TestWebhook() {
   })
   
   const [oneNetData, setOneNetData] = useState({
-    msg: '{"device_id": "device_001", "datastream_id": "temperature", "value": 25.6, "timestamp": "2024-01-01T00:00:00Z"}',
-    nonce: "abc12345",
-    signature: "test_signature",
+    msg: '{"deviceId": "2454063050", "deviceName": "bm280-bedroom", "messageType": "notify", "notifyType": "property", "productId": "11ijEEhVAe", "data": {"id": "734965", "version": "1.0", "params": {"temperature": {"value": 25.6, "time": 1752246936035}, "humidity": {"value": 60.2, "time": 1752246936035}, "pressure": {"value": 1013.25, "time": 1752246936035}}}}',
+    nonce: "FZOKIRdC", 
+    signature: "t1Z6pQZKUniiD573jtmuRQ==",
     time: Date.now(),
     id: "test_message_001"
   })
@@ -134,25 +134,51 @@ export default function TestWebhook() {
   }
 
   const generateOneNetData = () => {
-    const devices = ["device_001", "device_002", "device_003"]
-    const datastreams = ["temperature", "humidity", "pressure"]
+    const devices = [
+      { id: "2454063050", name: "bm280-bedroom" },
+      { id: "2454063051", name: "sensor-livingroom" },
+      { id: "2454063052", name: "monitor-kitchen" }
+    ]
     const randomDevice = devices[Math.floor(Math.random() * devices.length)]
-    const randomDatastream = datastreams[Math.floor(Math.random() * datastreams.length)]
-    const randomValue = (Math.random() * 100).toFixed(2)
+    
+    // 生成随机传感器数据
+    const temperature = (15 + Math.random() * 20).toFixed(1) // 15-35度
+    const humidity = (30 + Math.random() * 40).toFixed(1)    // 30-70%
+    const pressure = (950 + Math.random() * 100).toFixed(2)  // 950-1050 hPa
+    const currentTime = Date.now()
     
     const msgData = {
-      device_id: randomDevice,
-      datastream_id: randomDatastream,
-      value: Number.parseFloat(randomValue),
-      timestamp: new Date().toISOString()
+      deviceId: randomDevice.id,
+      deviceName: randomDevice.name,
+      messageType: "notify",
+      notifyType: "property",
+      productId: "11ijEEhVAe",
+      data: {
+        id: Math.floor(Math.random() * 999999).toString(),
+        version: "1.0",
+        params: {
+          temperature: {
+            value: Number.parseFloat(temperature),
+            time: currentTime
+          },
+          humidity: {
+            value: Number.parseFloat(humidity),
+            time: currentTime
+          },
+          pressure: {
+            value: Number.parseFloat(pressure),
+            time: currentTime
+          }
+        }
+      }
     }
 
     setOneNetData({
       ...oneNetData,
       msg: JSON.stringify(msgData),
       nonce: Math.random().toString(36).substring(2, 10),
-      time: Date.now(),
-      id: `msg_${Date.now()}`
+      time: currentTime,
+      id: `msg_${currentTime}`
     })
   }
 
