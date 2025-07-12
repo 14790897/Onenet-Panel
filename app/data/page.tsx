@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RefreshCw, Database, TrendingUp, Activity } from "lucide-react"
+import { SmartValueDisplay } from "@/components/smart-value-display"
 
 interface OneNetDataRecord {
   id: number
@@ -235,7 +236,15 @@ export default function DataView() {
                                 {record.datastream_id}
                               </code>
                             </td>
-                            <td className="p-2 font-mono">{record.value}</td>
+                            <td className="p-2">
+                              <SmartValueDisplay
+                                value={record.value}
+                                deviceId={record.device_id}
+                                datastreamId={record.datastream_id}
+                                className="font-mono"
+                                showTooltip={true}
+                              />
+                            </td>
                             <td className="p-2 text-sm text-gray-600 max-w-xs">
                               {formatRawData(record.raw_data)}
                             </td>
@@ -302,7 +311,13 @@ export default function DataView() {
                             <code className="bg-gray-100 px-2 py-1 rounded text-sm">
                               {record.datastream_id}
                             </code>
-                            <span className="font-mono text-lg">{record.value}</span>
+                            <SmartValueDisplay
+                              value={record.value}
+                              deviceId={record.device_id}
+                              datastreamId={record.datastream_id}
+                              className="font-mono text-lg"
+                              showTooltip={true}
+                            />
                           </div>
                           <span className="text-sm text-gray-500">
                             {formatTimestamp(record.created_at)}

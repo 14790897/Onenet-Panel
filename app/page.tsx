@@ -11,135 +11,134 @@ import { SystemHealth } from "@/components/system-health"
 import { AdminPanel } from "@/components/admin-panel"
 import { useToast } from "@/hooks/use-toast-custom"
 import { RefreshCw, Database, Wifi, Activity, TrendingUp, Settings } from "lucide-react"
+import { SmartValueDisplay } from "@/components/smart-value-display";
 
 interface OneNetDataItem {
-  id: number
-  device_id: string
-  datastream_id: string
-  value: number
-  timestamp: string
-  raw_data: any
-  created_at: string
+  id: number;
+  device_id: string;
+  datastream_id: string;
+  value: number;
+  timestamp: string;
+  raw_data: any;
+  created_at: string;
 }
 
 interface DataStats {
-  total_records: number
-  unique_devices: number
-  unique_datastreams: number
-  latest_timestamp: string
+  total_records: number;
+  unique_devices: number;
+  unique_datastreams: number;
+  latest_timestamp: string;
 }
 
 export default function OneNetDashboard() {
-  const [data, setData] = useState<OneNetDataItem[]>([]) // 确保初始化为空数组
-  const [stats, setStats] = useState<DataStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [dbInitialized, setDbInitialized] = useState<boolean | null>(null)
-  const [initLoading, setInitLoading] = useState(false)
-  const [showAdmin, setShowAdmin] = useState(false)
-  
-  const { toasts, success, error, removeToast } = useToast()
+  const [data, setData] = useState<OneNetDataItem[]>([]); // 确保初始化为空数组
+  const [stats, setStats] = useState<DataStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dbInitialized, setDbInitialized] = useState<boolean | null>(null);
+  const [initLoading, setInitLoading] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  const { toasts, success, error, removeToast } = useToast();
 
   const fetchData = async () => {
     try {
-      setRefreshing(true)
+      setRefreshing(true);
 
       // 获取最新数据
-      const dataResponse = await fetch("/api/data?type=latest&limit=20")
+      const dataResponse = await fetch("/api/data?type=latest&limit=20");
       if (!dataResponse.ok) {
-        throw new Error(`HTTP ${dataResponse.status}: ${dataResponse.statusText}`)
+        throw new Error(
+          `HTTP ${dataResponse.status}: ${dataResponse.statusText}`
+        );
       }
-      const dataResult = await dataResponse.json()
+      const dataResult = await dataResponse.json();
 
       // 获取统计信息
-      const statsResponse = await fetch("/api/data?type=stats")
+      const statsResponse = await fetch("/api/data?type=stats");
       if (!statsResponse.ok) {
-        throw new Error(`HTTP ${statsResponse.status}: ${statsResponse.statusText}`)
+        throw new Error(
+          `HTTP ${statsResponse.status}: ${statsResponse.statusText}`
+        );
       }
-      const statsResult = await statsResponse.json()
+      const statsResult = await statsResponse.json();
 
       if (dataResult.success && Array.isArray(dataResult.data)) {
-        setData(dataResult.data)
-        success(`刷新成功，获取到 ${dataResult.data.length} 条数据`)
+        setData(dataResult.data);
+        success(`刷新成功，获取到 ${dataResult.data.length} 条数据`);
       } else {
-        setData([]) // 确保 data 始终是数组
-        error("获取数据失败：" + (dataResult.error || "数据格式错误"))
+        setData([]); // 确保 data 始终是数组
+        error("获取数据失败：" + (dataResult.error || "数据格式错误"));
       }
 
       if (statsResult.success) {
-        setStats(statsResult.data)
+        setStats(statsResult.data);
       } else {
-        error("获取统计信息失败：" + statsResult.error)
+        error("获取统计信息失败：" + statsResult.error);
       }
     } catch (err) {
-      console.error("Error fetching data:", err)
-      setData([]) // 确保 data 始终是数组
-      error("网络请求失败，请检查连接")
+      console.error("Error fetching data:", err);
+      setData([]); // 确保 data 始终是数组
+      error("网络请求失败，请检查连接");
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setLoading(false);
+      setRefreshing(false);
     }
-  }
+  };
 
   // 在现有的 fetchData 函数后添加数据库初始化函数
   const initializeDatabase = async () => {
     try {
-      setInitLoading(true)
-      const response = await fetch("/api/init-db", { method: "POST" })
-      const result = await response.json()
+      setInitLoading(true);
+      const response = await fetch("/api/init-db", { method: "POST" });
+      const result = await response.json();
 
       if (result.success) {
-        setDbInitialized(true)
-        success("数据库初始化成功！")
+        setDbInitialized(true);
+        success("数据库初始化成功！");
         // 初始化成功后立即获取数据
-        await fetchData()
+        await fetchData();
       } else {
-        console.error("数据库初始化失败:", result.error)
-        error("数据库初始化失败：" + result.error)
+        console.error("数据库初始化失败:", result.error);
+        error("数据库初始化失败：" + result.error);
       }
     } catch (err) {
-      console.error("初始化请求失败:", err)
-      error("初始化请求失败，请检查网络连接")
+      console.error("初始化请求失败:", err);
+      error("初始化请求失败，请检查网络连接");
     } finally {
-      setInitLoading(false)
+      setInitLoading(false);
     }
-  }
+  };
 
   const checkDatabaseStatus = async () => {
     try {
-      const response = await fetch("/api/init-db")
-      const result = await response.json()
+      const response = await fetch("/api/init-db");
+      const result = await response.json();
 
       if (result.success) {
-        setDbInitialized(result.tableExists)
+        setDbInitialized(result.tableExists);
         if (result.tableExists) {
-          await fetchData()
+          await fetchData();
         } else {
-          setLoading(false)
+          setLoading(false);
         }
       }
     } catch (err) {
-      console.error("检查数据库状态失败:", err)
-      setDbInitialized(false)
-      setLoading(false)
-      error("检查数据库状态失败")
+      console.error("检查数据库状态失败:", err);
+      setDbInitialized(false);
+      setLoading(false);
+      error("检查数据库状态失败");
     }
-  }
+  };
 
   // 修改 useEffect，先检查数据库状态
   useEffect(() => {
-    checkDatabaseStatus()
-  }, [])
+    checkDatabaseStatus();
+  }, []);
 
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString("zh-CN")
-  }
-
-  const getValueColor = (value: number) => {
-    if (value > 80) return "text-red-600"
-    if (value > 50) return "text-yellow-600"
-    return "text-green-600"
-  }
+    return new Date(timestamp).toLocaleString("zh-CN");
+  };
 
   return (
     <>
@@ -181,6 +180,15 @@ export default function OneNetDashboard() {
                 >
                   <Database className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
                   <span className="hidden sm:inline">数据</span>查看
+                </Button>
+              </Link>
+              <Link href="/demo" className="flex-1 sm:flex-none">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto text-xs lg:text-sm"
+                >
+                  <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  <span className="hidden sm:inline">颜色</span>演示
                 </Button>
               </Link>
               <Link href="/test-webhook" className="flex-1 sm:flex-none">
@@ -358,15 +366,13 @@ export default function OneNetDashboard() {
                                 <span className="text-xs lg:text-sm text-gray-600">
                                   数值:
                                 </span>
-                                <span
-                                  className={`text-lg lg:text-xl font-semibold ${getValueColor(
-                                    item.value
-                                  )}`}
-                                >
-                                  {typeof item.value === "number"
-                                    ? item.value.toLocaleString()
-                                    : item.value}
-                                </span>
+                                <SmartValueDisplay
+                                  value={item.value}
+                                  deviceId={item.device_id}
+                                  datastreamId={item.datastream_id}
+                                  className="text-lg lg:text-xl"
+                                  showTooltip={true}
+                                />
                               </div>
                               <div className="text-xs text-gray-400">
                                 ID: {item.id}
