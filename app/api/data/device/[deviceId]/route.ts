@@ -3,10 +3,10 @@ import { getDataByDevice } from "@/lib/database"
 
 export async function GET(
   request: Request,
-  { params }: { params: { deviceId: string } }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {
-    const deviceId = params.deviceId
+    const { deviceId } = await params
     const data = await getDataByDevice(deviceId, 20)
     return NextResponse.json(data)
   } catch (error) {

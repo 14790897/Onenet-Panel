@@ -50,6 +50,12 @@ OneNet数据监控平台是一个完整的物联网数据接收、存储、分�
   - 移除对不存在的icon-192.png的引用
   - 优化PWA图标配置兼容性
 
+- ✅ **Next.js 15兼容性修复**
+  - 修复动态路由参数异步访问错误
+  - 将viewport配置从metadata迁移到独立的viewport导出
+  - 将themeColor配置移动到viewport导出
+  - 解决Next.js 15对metadata配置的新要求
+
 - ✅ **数据处理稳定性提升**
   - 加强API响应验证
   - 确保所有数据状态始终为数组类型
