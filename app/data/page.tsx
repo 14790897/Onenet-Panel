@@ -29,10 +29,19 @@ export default function DataView() {
       const response = await fetch('/api/data')
       if (response.ok) {
         const result = await response.json()
-        setData(result)
+        if (result.success && Array.isArray(result.data)) {
+          setData(result.data)
+        } else {
+          setData([]) // 确保始终为数组
+          console.error('获取数据失败:', result.error || '数据格式错误')
+        }
+      } else {
+        setData([]) // 确保始终为数组
+        console.error('获取数据失败，状态码:', response.status)
       }
     } catch (error) {
       console.error('获取数据失败:', error)
+      setData([]) // 确保始终为数组
     } finally {
       setLoading(false)
     }
@@ -44,6 +53,8 @@ export default function DataView() {
       if (response.ok) {
         const result = await response.json()
         setStats(result)
+      } else {
+        console.error('获取统计失败，状态码:', response.status)
       }
     } catch (error) {
       console.error('获取统计失败:', error)
@@ -56,10 +67,19 @@ export default function DataView() {
       const response = await fetch(`/api/data/device/${deviceId}`)
       if (response.ok) {
         const result = await response.json()
-        setData(result)
+        if (Array.isArray(result)) {
+          setData(result)
+        } else {
+          setData([]) // 确保始终为数组
+          console.error('获取设备数据失败: 数据格式错误')
+        }
+      } else {
+        setData([]) // 确保始终为数组
+        console.error('获取设备数据失败，状态码:', response.status)
       }
     } catch (error) {
       console.error('获取设备数据失败:', error)
+      setData([]) // 确保始终为数组
     } finally {
       setLoading(false)
     }
@@ -70,7 +90,7 @@ export default function DataView() {
     fetchStats()
   }, [])
 
-  const uniqueDevices = Array.from(new Set(data.map(item => item.device_id)))
+  const uniqueDevices = Array.from(new Set((Array.isArray(data) ? data : []).map(item => item.device_id)))
 
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('zh-CN')
