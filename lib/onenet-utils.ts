@@ -184,14 +184,29 @@ export function parseThingModelParams(params: any): Array<{
       const param = paramData as any
       let numericValue = 0
 
-      // 尝试转换为数字
-      if (typeof param.value === 'number') {
+      // 添加详细调试信息
+      console.log(`解析参数 ${paramName}:`, {
+        paramData,
+        paramValue: param.value,
+        paramValueType: typeof param.value
+      })
+
+      // 尝试转换为数字 - 更强健的转换逻辑
+      if (typeof param.value === 'number' && !isNaN(param.value)) {
         numericValue = param.value
-      } else if (typeof param.value === 'string' && !isNaN(Number(param.value))) {
-        numericValue = Number(param.value)
+      } else if (typeof param.value === 'string') {
+        const parsed = parseFloat(param.value)
+        numericValue = isNaN(parsed) ? 0 : parsed
       } else if (typeof param.value === 'boolean') {
         numericValue = param.value ? 1 : 0
       }
+      
+      // 如果原始值看起来是数字但转换失败，记录警告
+      if (numericValue === 0 && param.value !== 0 && param.value !== '0' && param.value !== false) {
+        console.warn(`数值转换可能有问题: ${paramName} = ${param.value} (类型: ${typeof param.value})`)
+      }
+
+      console.log(`转换结果 ${paramName}: ${param.value} -> ${numericValue}`)
 
       result.push({
         name: paramName,

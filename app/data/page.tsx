@@ -151,6 +151,22 @@ export default function DataView() {
     return info.length > 0 ? info.join(', ') : JSON.stringify(rawData).substring(0, 100) + '...'
   }
 
+  // 获取用于显示的数值，优先使用原始值
+  const getDisplayValue = (record: OneNetDataRecord) => {
+    // 如果数据库中的值是0，但原始值存在且不是0，则使用原始值
+    if (record.value === 0 && record.raw_data?.originalValue !== undefined && record.raw_data.originalValue !== 0) {
+      const originalValue = record.raw_data.originalValue
+      // 尝试转换原始值为数字
+      if (typeof originalValue === 'number') {
+        return originalValue
+      } else if (typeof originalValue === 'string') {
+        const parsed = parseFloat(originalValue)
+        return isNaN(parsed) ? record.value : parsed
+      }
+    }
+    return record.value
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -305,7 +321,7 @@ export default function DataView() {
                             </td>
                             <td className="p-2">
                               <SmartValueDisplay
-                                value={record.value}
+                                value={getDisplayValue(record)}
                                 deviceId={record.device_id}
                                 datastreamId={record.datastream_id}
                                 className="font-mono"

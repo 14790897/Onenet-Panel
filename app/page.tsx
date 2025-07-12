@@ -140,6 +140,22 @@ export default function OneNetDashboard() {
     return new Date(timestamp).toLocaleString("zh-CN");
   };
 
+  // 获取用于显示的数值，优先使用原始值
+  const getDisplayValue = (record: OneNetDataItem) => {
+    // 如果数据库中的值是0，但原始值存在且不是0，则使用原始值
+    if (record.value === 0 && record.raw_data?.originalValue !== undefined && record.raw_data.originalValue !== 0) {
+      const originalValue = record.raw_data.originalValue
+      // 尝试转换原始值为数字
+      if (typeof originalValue === 'number') {
+        return originalValue
+      } else if (typeof originalValue === 'string') {
+        const parsed = parseFloat(originalValue)
+        return isNaN(parsed) ? record.value : parsed
+      }
+    }
+    return record.value
+  };
+
   return (
     <>
       <div className="min-h-screen bg-gray-50 p-4">
@@ -367,7 +383,7 @@ export default function OneNetDashboard() {
                                   数值:
                                 </span>
                                 <SmartValueDisplay
-                                  value={item.value}
+                                  value={getDisplayValue(item)}
                                   deviceId={item.device_id}
                                   datastreamId={item.datastream_id}
                                   className="text-lg lg:text-xl"
