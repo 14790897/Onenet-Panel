@@ -161,62 +161,334 @@ export function isThingModelMessage(data: any): data is OneNetThingModelMessage 
  * 解析物模型参数数据
  */
 export function parseThingModelParams(params: any): Array<{
-  name: string
-  value: any
-  numericValue: number
-  time: number
-  originalValue: any
+  name: string;
+  value: any;
+  numericValue: number;
+  time: number;
+  originalValue: any;
 }> {
   const result: Array<{
-    name: string
-    value: any
-    numericValue: number
-    time: number
-    originalValue: any
-  }> = []
+    name: string;
+    value: any;
+    numericValue: number;
+    time: number;
+    originalValue: any;
+  }> = [];
 
-  if (!params || typeof params !== 'object') {
-    return result
+  if (!params || typeof params !== "object") {
+    console.log("parseThingModelParams: params为空或不是对象", params);
+    return result;
   }
 
+  console.log("parseThingModelParams: 开始解析参数", params);
+
   for (const [paramName, paramData] of Object.entries(params)) {
-    if (paramData && typeof paramData === 'object') {
-      const param = paramData as any
-      let numericValue = 0
+    console.log(`处理参数 ${paramName}:`, paramData);
+
+    // 检查参数数据结构
+    if (paramData && typeof paramData === "object") {
+      const param = paramData as any;
+      let numericValue = 0;
 
       // 添加详细调试信息
       console.log(`解析参数 ${paramName}:`, {
         paramData,
         paramValue: param.value,
-        paramValueType: typeof param.value
-      })
+        paramValueType: typeof param.value,
+        hasValue: param.hasOwnProperty("value"),
+        paramKeys: Object.keys(param),
+      });
 
-      // 尝试转换为数字 - 更强健的转换逻辑
-      if (typeof param.value === 'number' && !isNaN(param.value)) {
-        numericValue = param.value
-      } else if (typeof param.value === 'string') {
-        const parsed = parseFloat(param.value)
-        numericValue = isNaN(parsed) ? 0 : parsed
-      } else if (typeof param.value === 'boolean') {
-        numericValue = param.value ? 1 : 0
+      // 更强健的数值转换逻辑
+      if (param.hasOwnProperty("value")) {
+        const rawValue = param.value;
+
+        if (typeof rawValue === "number" && !isNaN(rawValue)) {
+          numericValue = rawValue;
+        } else if (typeof rawValue === "string") {
+          // 尝试解析字符串数字
+          const trimmed = rawValue.trim();
+          if (trimmed !== "") {
+            const parsed = parseFloat(trimmed);
+            numericValue = isNaN(parsed) ? 0 : parsed;
+          }
+        } else if (typeof rawValue === "boolean") {
+          numericValue = rawValue ? 1 : 0;
+        } else if (rawValue === null || rawValue === undefined) {
+          numericValue = 0;
+        } else {
+          // 尝试强制转换其他类型
+          const parsed = Number(rawValue);
+          numericValue = isNaN(parsed) ? 0 : parsed;
+        }
+      } else {
+        // 如果没有value字段，检查是否直接是数值
+        if (typeof paramData === "number" && !isNaN(paramData)) {
+          numericValue = paramData;
+          param.value = paramData;
+        }
       }
-      
+
+      // 记录转换结果
+      console.log(`转换结果 ${paramName}: ${param.value} -> ${numericValue}`);
+
       // 如果原始值看起来是数字但转换失败，记录警告
-      if (numericValue === 0 && param.value !== 0 && param.value !== '0' && param.value !== false) {
-        console.warn(`数值转换可能有问题: ${paramName} = ${param.value} (类型: ${typeof param.value})`)
+      if (
+        numericValue === 0 &&
+        param.value !== 0 &&
+        param.value !== "0" &&
+        param.value !== false &&
+        param.value !== null &&
+        param.value !== undefined
+      ) {
+        console.warn(
+          `数值转换可能有问题: ${paramName} = ${
+            param.value
+          } (类型: ${typeof param.value})`
+        );
       }
-
-      console.log(`转换结果 ${paramName}: ${param.value} -> ${numericValue}`)
 
       result.push({
         name: paramName,
         value: param.value,
         numericValue,
         time: param.time || Date.now(),
-        originalValue: param.value
-      })
+        originalValue: param.value,
+      });
+    } else {
+      // 处理非对象类型的参数数据
+      console.log(
+        `参数 ${paramName} 不是对象类型:`,
+        typeof paramData,
+        paramData
+      );
+
+      let numericValue = 0;
+      if (typeof paramData === "number" && !isNaN(paramData)) {
+        numericValue = paramData;
+      } else if (typeof paramData === "string") {
+        const parsed = parseFloat(paramData.trim());
+        numericValue = isNaN(parsed) ? 0 : parsed;
+      }
+
+      result.push({
+        name: paramName,
+        value: paramData,
+        numericValue,
+        time: Date.now(),
+        originalValue: paramData,
+      });
     }
   }
 
-  return result
+  console.log("parseThingModelParams: 解析完成", result);
+  return result;
+}
+
+/**
+ * 设备数据分析工具
+ */
+export interface DeviceDataPoint {
+  device_id: string;
+  device_name?: string;
+  datastream_id: string;
+  value: number;
+  timestamp: string;
+  raw_data?: any;
+}
+
+/**
+ * 获取设备友好名称
+ */
+export function getDeviceFriendlyName(deviceId: string, rawData?: any): string {
+  // 从原始数据中提取设备名称
+  if (rawData?.deviceName) {
+    return rawData.deviceName;
+  }
+
+  // 根据设备ID映射友好名称
+  const deviceNameMap: Record<string, string> = {
+    "2454895254": "客厅传感器",
+    "2454063050": "卧室传感器",
+    "living-room": "客厅传感器",
+    "bm280-bedroom": "卧室传感器",
+  };
+
+  return deviceNameMap[deviceId] || `设备 ${deviceId}`;
+}
+
+/**
+ * 获取数据流友好名称和单位
+ */
+export function getDatastreamInfo(datastreamId: string): {
+  name: string;
+  unit: string;
+  icon: string;
+} {
+  const datastreamMap: Record<
+    string,
+    { name: string; unit: string; icon: string }
+  > = {
+    temperature: { name: "温度", unit: "°C", icon: "🌡️" },
+    pressure: { name: "气压", unit: "hPa", icon: "🌪️" },
+    altitude: { name: "海拔", unit: "m", icon: "⛰️" },
+    humidity: { name: "湿度", unit: "%", icon: "💧" },
+  };
+
+  return (
+    datastreamMap[datastreamId] || { name: datastreamId, unit: "", icon: "📊" }
+  );
+}
+
+/**
+ * 格式化数值显示
+ */
+export function formatSensorValue(value: number, datastreamId: string): string {
+  const info = getDatastreamInfo(datastreamId);
+
+  // 根据数据类型决定小数位数
+  let decimals = 1;
+  if (datastreamId === "pressure") {
+    decimals = 2;
+  } else if (datastreamId === "altitude") {
+    decimals = 0;
+  }
+
+  return `${value.toFixed(decimals)}${info.unit}`;
+}
+
+/**
+ * 判断传感器数值是否异常
+ */
+export function isSensorValueAbnormal(
+  value: number,
+  datastreamId: string
+): boolean {
+  const thresholds: Record<string, { min: number; max: number }> = {
+    temperature: { min: -40, max: 60 }, // 温度范围 -40°C 到 60°C
+    pressure: { min: 800, max: 1200 }, // 气压范围 800-1200 hPa
+    altitude: { min: -500, max: 9000 }, // 海拔范围 -500m 到 9000m
+    humidity: { min: 0, max: 100 }, // 湿度范围 0-100%
+  };
+
+  const threshold = thresholds[datastreamId];
+  if (!threshold) return false;
+
+  return value < threshold.min || value > threshold.max;
+}
+
+/**
+ * 计算传感器数据趋势
+ */
+export function calculateDataTrend(
+  data: DeviceDataPoint[]
+): "rising" | "falling" | "stable" {
+  if (data.length < 2) return "stable";
+
+  // 取最近的几个数据点计算趋势
+  const recentData = data.slice(-5);
+  const values = recentData.map((d) => d.value);
+
+  // 计算简单的线性趋势
+  let rising = 0;
+  let falling = 0;
+
+  for (let i = 1; i < values.length; i++) {
+    const diff = values[i] - values[i - 1];
+    if (Math.abs(diff) > 0.1) {
+      // 忽略微小变化
+      if (diff > 0) rising++;
+      else falling++;
+    }
+  }
+
+  if (rising > falling) return "rising";
+  if (falling > rising) return "falling";
+  return "stable";
+}
+
+/**
+ * 生成数据摘要报告
+ */
+export function generateDataSummary(data: DeviceDataPoint[]): {
+  deviceCount: number;
+  datastreamCount: number;
+  latestTimestamp: string;
+  deviceSummaries: Array<{
+    deviceId: string;
+    deviceName: string;
+    datastreams: Array<{
+      name: string;
+      latestValue: string;
+      trend: "rising" | "falling" | "stable";
+      isAbnormal: boolean;
+    }>;
+  }>;
+} {
+  const deviceGroups = new Map<string, DeviceDataPoint[]>();
+
+  // 按设备分组
+  data.forEach((point) => {
+    const key = point.device_id;
+    if (!deviceGroups.has(key)) {
+      deviceGroups.set(key, []);
+    }
+    deviceGroups.get(key)!.push(point);
+  });
+
+  const deviceSummaries = Array.from(deviceGroups.entries()).map(
+    ([deviceId, deviceData]) => {
+      const datastreamGroups = new Map<string, DeviceDataPoint[]>();
+
+      // 按数据流分组
+      deviceData.forEach((point) => {
+        const key = point.datastream_id;
+        if (!datastreamGroups.has(key)) {
+          datastreamGroups.set(key, []);
+        }
+        datastreamGroups.get(key)!.push(point);
+      });
+
+      const datastreams = Array.from(datastreamGroups.entries()).map(
+        ([datastreamId, streamData]) => {
+          // 按时间排序
+          streamData.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+
+          const latest = streamData[streamData.length - 1];
+          const trend = calculateDataTrend(streamData);
+          const isAbnormal = isSensorValueAbnormal(latest.value, datastreamId);
+
+          return {
+            name: getDatastreamInfo(datastreamId).name,
+            latestValue: formatSensorValue(latest.value, datastreamId),
+            trend,
+            isAbnormal,
+          };
+        }
+      );
+
+      return {
+        deviceId,
+        deviceName: getDeviceFriendlyName(deviceId, deviceData[0]?.raw_data),
+        datastreams,
+      };
+    }
+  );
+
+  return {
+    deviceCount: deviceGroups.size,
+    datastreamCount: new Set(data.map((d) => d.datastream_id)).size,
+    latestTimestamp:
+      data.length > 0
+        ? data.reduce((latest, current) =>
+            new Date(current.timestamp) > new Date(latest.timestamp)
+              ? current
+              : latest
+          ).timestamp
+        : "",
+    deviceSummaries,
+  };
 }

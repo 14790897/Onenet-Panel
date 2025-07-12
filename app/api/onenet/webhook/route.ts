@@ -70,60 +70,65 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body: OneNetPushMessage = await request.json()
+    const body: OneNetPushMessage = await request.json();
     console.log("收到OneNET推送数据:", {
       hasMsg: !!body.msg,
       signature: body.signature,
       nonce: body.nonce,
       time: body.time,
-      id: body.id
-    })
+      id: body.id,
+    });
 
     // 验证必需字段
     if (!body.msg || !body.signature || !body.nonce) {
       return NextResponse.json(
         { error: "Missing required fields: msg, signature, or nonce" },
         { status: 400 }
-      )
+      );
     }
 
     // 检查重复消息
     if (body.id && isDuplicateMessage(body.id)) {
-      console.log(`重复消息，跳过处理: ${body.id}`)
-      return new NextResponse('OK', { status: 200 })
+      console.log(`重复消息，跳过处理: ${body.id}`);
+      return new NextResponse("OK", { status: 200 });
     }
 
     // 验证签名
-    const isValidSignature = verifyOneNetSignature(body.msg, body.nonce, body.signature, ONENET_TOKEN)
-    
-    if (!isValidSignature && ONENET_TOKEN !== 'your_onenet_token_here') {
-      console.error('OneNET签名验证失败')
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      )
+    const isValidSignature = verifyOneNetSignature(
+      body.msg,
+      body.nonce,
+      body.signature,
+      ONENET_TOKEN
+    );
+
+    if (!isValidSignature && ONENET_TOKEN !== "your_onenet_token_here") {
+      console.error("OneNET签名验证失败");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     // 解析消息内容
-    let messageData
+    let messageData;
     try {
       // 判断是否为加密消息（如果配置了AES密钥且消息看起来是Base64编码）
-      const isEncrypted = Boolean(ONENET_AES_KEY && ONENET_AES_KEY.length === 16 && 
-                         /^[A-Za-z0-9+/=]+$/.test(body.msg))
-      
-      messageData = parseOneNetMessage(body.msg, isEncrypted)
-      console.log('解析的消息数据:', messageData)
+      const isEncrypted = Boolean(
+        ONENET_AES_KEY &&
+          ONENET_AES_KEY.length === 16 &&
+          /^[A-Za-z0-9+/=]+$/.test(body.msg)
+      );
+
+      messageData = parseOneNetMessage(body.msg, isEncrypted);
+      console.log("解析的消息数据:", messageData);
     } catch (parseError) {
-      console.error('消息解析失败:', parseError)
+      console.error("消息解析失败:", parseError);
       // 即使解析失败也返回200，避免OneNET重推
-      return new NextResponse('OK', { status: 200 })
+      return new NextResponse("OK", { status: 200 });
     }
 
     // 处理不同类型的OneNET消息
-    await processOneNetMessage(messageData, body)
+    await processOneNetMessage(messageData, body);
 
     // 必须快速返回200状态码，避免OneNET认为推送失败而重试
-    return new NextResponse('OK', { status: 200 })
+    return new NextResponse("OK", { status: 200 });
   } catch (error) {
     console.error("OneNET数据处理错误:", error)
     // 即使出错也返回200，避免无限重试
