@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
-import { TrendingUp, Calendar, HardDrive, Filter, Download } from "lucide-react"
+import { TrendingUp, Calendar, HardDrive, Filter, Download, RotateCcw } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { addDays } from "date-fns"
 import { RealtimeChart } from "@/components/realtime-chart"
+import { useAnalyticsPreferences } from "@/lib/analytics-preferences"
 
 interface DeviceData {
   id: number
@@ -48,6 +49,53 @@ export default function AnalyticsPage() {
     from: addDays(new Date(), -7),
     to: new Date(),
   })
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+  
+  const { savePreferences, loadPreferences, clearPreferences } = useAnalyticsPreferences()
+
+  // 恢复用户偏好设置
+  useEffect(() => {
+    const preferences = loadPreferences()
+    if (preferences) {
+      if (preferences.selectedDevices && preferences.selectedDevices.length > 0) {
+        setSelectedDevices(preferences.selectedDevices)
+      }
+      if (preferences.selectedDatastream) {
+        setSelectedDatastream(preferences.selectedDatastream)
+      }
+      if (preferences.dateRange) {
+        setDateRange({
+          from: new Date(preferences.dateRange.from),
+          to: new Date(preferences.dateRange.to)
+        })
+      }
+    }
+    setPreferencesLoaded(true)
+  }, [])
+
+  // 保存当前偏好设置
+  const saveCurrentPreferences = () => {
+    savePreferences({
+      selectedDevices: selectedDevices.length > 0 ? selectedDevices : undefined,
+      selectedDatastream: selectedDatastream || undefined,
+      dateRange: dateRange ? {
+        from: dateRange.from?.toISOString() || '',
+        to: dateRange.to?.toISOString() || ''
+      } : undefined
+    })
+  }
+
+  // 重置偏好设置
+  const resetPreferences = () => {
+    clearPreferences()
+    setSelectedDevices([])
+    setSelectedDatastream("")
+    setDateRange({
+      from: addDays(new Date(), -7),
+      to: new Date(),
+    })
+    setChartData([])
+  }
 
   // 获取设备列表
   const fetchDevices = async () => {
@@ -109,11 +157,23 @@ export default function AnalyticsPage() {
 
   // 处理设备选择
   const handleDeviceSelect = (deviceId: string, checked: boolean) => {
+    let newSelectedDevices;
     if (checked) {
-      setSelectedDevices([...selectedDevices, deviceId])
+      newSelectedDevices = [...selectedDevices, deviceId];
     } else {
-      setSelectedDevices(selectedDevices.filter(id => id !== deviceId))
+      newSelectedDevices = selectedDevices.filter(id => id !== deviceId);
     }
+    setSelectedDevices(newSelectedDevices);
+    
+    // 保存偏好设置
+    savePreferences({
+      selectedDevices: newSelectedDevices.length > 0 ? newSelectedDevices : undefined,
+      selectedDatastream: selectedDatastream || undefined,
+      dateRange: dateRange ? {
+        from: dateRange.from?.toISOString() || '',
+        to: dateRange.to?.toISOString() || ''
+      } : undefined
+    });
   }
 
   // 获取所有可用的数据流
@@ -192,6 +252,15 @@ export default function AnalyticsPage() {
                 返回首页
               </Button>
             </Link>
+            <Button 
+              onClick={resetPreferences} 
+              variant="outline" 
+              size="sm"
+              title="重置分析偏好"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              重置
+            </Button>
             <Button onClick={exportData} disabled={chartData.length === 0}>
               <Download className="w-4 h-4 mr-2" />
               导出数据
@@ -226,7 +295,17 @@ export default function AnalyticsPage() {
             {/* 数据流选择 */}
             <div className="space-y-2">
               <Label>数据流类型</Label>
-              <Select value={selectedDatastream} onValueChange={setSelectedDatastream}>
+              <Select value={selectedDatastream} onValueChange={(value) => {
+                setSelectedDatastream(value);
+                savePreferences({
+                  selectedDevices: selectedDevices.length > 0 ? selectedDevices : undefined,
+                  selectedDatastream: value || undefined,
+                  dateRange: dateRange ? {
+                    from: dateRange.from?.toISOString() || '',
+                    to: dateRange.to?.toISOString() || ''
+                  } : undefined
+                });
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="选择数据流类型" />
                 </SelectTrigger>

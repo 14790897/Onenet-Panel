@@ -262,3 +262,55 @@ ONENET_API_KEY=your_api_key (可选)
 **技术栈**: Next.js 15, TypeScript, PostgreSQL, Tailwind CSS  
 **部署**: Vercel (推荐) 或自托管  
 **维护状态**: 活跃开发中
+
+## 🍪 用户偏好设置系统 (2025-07-12)
+
+### 新增功能
+- ✅ **数据页面偏好记忆**
+  - 自动保存上次选择的设备和标签页
+  - 使用Cookie存储，30天有效期
+  - 页面刷新后自动恢复上次的查看状态
+
+- ✅ **分析页面偏好记忆**
+  - 保存选中的设备列表和数据流类型
+  - 记忆时间范围选择
+  - 智能恢复分析配置，提升用户体验
+
+- ✅ **偏好管理功能**
+  - 重置按钮快速清除所有偏好设置
+  - 偏好状态指示器显示当前配置
+  - 自动过期机制，避免过时配置
+
+- ✅ **用户体验优化**
+  - 保存操作实时反馈
+  - 偏好恢复状态提示
+  - 无服务器环境兼容
+
+### 技术实现
+- **存储方式**: 浏览器Cookie (HttpOnly=false, SameSite=Lax)
+- **数据格式**: JSON编码，URL安全编码
+- **过期策略**: 30天自动过期
+- **组件**: `PreferenceIndicator` 状态指示器
+
+### 支持的偏好设置
+
+#### 数据页面 (`/data`)
+- `selectedDevice`: 选中的设备ID
+- `activeTab`: 当前激活的标签页 ('all' | 'device')
+- `lastVisit`: 最后访问时间
+
+#### 分析页面 (`/analytics`)
+- `selectedDevices`: 选中的设备列表
+- `selectedDatastream`: 选中的数据流类型
+- `dateRange`: 时间范围选择
+- `autoRefresh`: 自动刷新设置
+- `refreshInterval`: 刷新间隔
+
+### 使用示例
+```tsx
+// 数据页面
+const { savePreferences, loadPreferences, clearPreferences } = useDataViewPreferences();
+
+// 分析页面
+const { savePreferences, loadPreferences, clearPreferences } = useAnalyticsPreferences();
+```

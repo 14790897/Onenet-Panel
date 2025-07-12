@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RefreshCw, Database, TrendingUp, Activity } from "lucide-react"
+import { RefreshCw, Database, TrendingUp, Activity, Settings, RotateCcw } from "lucide-react"
 import { SmartValueDisplay } from "@/components/smart-value-display"
+import { useDataViewPreferences } from "@/lib/data-view-preferences"
 
 interface OneNetDataRecord {
   id: number
@@ -23,6 +24,24 @@ export default function DataView() {
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<string>("")
+  const [activeTab, setActiveTab] = useState<string>("all")
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false)
+  
+  const { savePreferences, loadPreferences, clearPreferences } = useDataViewPreferences()
+
+  // 恢复用户偏好设置
+  useEffect(() => {
+    const preferences = loadPreferences()
+    if (preferences) {
+      if (preferences.selectedDevice) {
+        setSelectedDevice(preferences.selectedDevice)
+      }
+      if (preferences.activeTab) {
+        setActiveTab(preferences.activeTab)
+      }
+    }
+    setPreferencesLoaded(true)
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -87,9 +106,32 @@ export default function DataView() {
   }
 
   useEffect(() => {
-    fetchData()
+    // 等待偏好设置加载完成后再获取数据
+    if (!preferencesLoaded) return
+    
+    if (selectedDevice && activeTab === "device") {
+      fetchDeviceData(selectedDevice)
+    } else {
+      fetchData()
+    }
     fetchStats()
-  }, [])
+  }, [preferencesLoaded, selectedDevice, activeTab])
+
+  // 保存用户偏好设置
+  const saveCurrentPreferences = () => {
+    savePreferences({
+      selectedDevice: selectedDevice || undefined,
+      activeTab
+    })
+  }
+
+  // 清除偏好设置
+  const resetPreferences = () => {
+    clearPreferences()
+    setSelectedDevice("")
+    setActiveTab("all")
+    fetchData()
+  }
 
   const uniqueDevices = Array.from(new Set((Array.isArray(data) ? data : []).map(item => item.device_id)))
 
@@ -130,6 +172,15 @@ export default function DataView() {
                 返回首页
               </Button>
             </Link>
+            <Button 
+              onClick={resetPreferences} 
+              variant="outline" 
+              size="sm"
+              title="重置查看偏好"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              重置
+            </Button>
             <Button onClick={fetchData} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               刷新数据
@@ -192,11 +243,27 @@ export default function DataView() {
           </div>
         )}
 
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList>
-            <TabsTrigger value="all">所有数据</TabsTrigger>
-            <TabsTrigger value="device">按设备查看</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value)
+          savePreferences({ activeTab: value, selectedDevice })
+        }} className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <TabsList>
+              <TabsTrigger value="all">所有数据</TabsTrigger>
+              <TabsTrigger value="device">按设备查看</TabsTrigger>
+            </TabsList>
+            
+            {/* 偏好设置状态指示 */}
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              {selectedDevice && (
+                <Badge variant="secondary" className="text-xs">
+                  <Settings className="w-3 h-3 mr-1" />
+                  已选设备: {selectedDevice}
+                </Badge>
+              )}
+              <span className="text-xs">偏好已保存</span>
+            </div>
+          </div>
 
           <TabsContent value="all" className="space-y-4">
             <Card>
@@ -276,6 +343,8 @@ export default function DataView() {
                     size="sm"
                     onClick={() => {
                       setSelectedDevice("")
+                      setActiveTab("all")
+                      savePreferences({ selectedDevice: undefined, activeTab: "all" })
                       fetchData()
                     }}
                   >
@@ -288,6 +357,7 @@ export default function DataView() {
                       size="sm"
                       onClick={() => {
                         setSelectedDevice(deviceId)
+                        savePreferences({ selectedDevice: deviceId, activeTab: "device" })
                         fetchDeviceData(deviceId)
                       }}
                     >
