@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless"
+import { withCache, generateCacheKey } from "./cache"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -21,35 +22,73 @@ export async function insertOneNetData(data: OneNetData) {
   return result[0]
 }
 
-export async function getLatestData(limit = 50) {
-  const result = await sql`
-    SELECT * FROM onenet_data 
-    ORDER BY timestamp DESC 
-    LIMIT ${limit}
-  `
-  return result
+export async function getLatestData(
+  limit = 50, 
+  offset = 0, 
+  deviceId?: string, 
+  datastream?: string
+) {
+  if (deviceId && datastream) {
+    const result = await sql`
+      SELECT * FROM onenet_data 
+      WHERE device_id = ${deviceId} AND datastream_id = ${datastream}
+      ORDER BY timestamp DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result
+  } else if (deviceId) {
+    const result = await sql`
+      SELECT * FROM onenet_data 
+      WHERE device_id = ${deviceId}
+      ORDER BY timestamp DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result
+  } else if (datastream) {
+    const result = await sql`
+      SELECT * FROM onenet_data 
+      WHERE datastream_id = ${datastream}
+      ORDER BY timestamp DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result
+  } else {
+    const result = await sql`
+      SELECT * FROM onenet_data 
+      ORDER BY timestamp DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    return result
+  }
 }
 
-export async function getDataByDevice(deviceId: string, limit = 20) {
+export async function getDataByDevice(deviceId: string, limit = 20, offset = 0) {
   const result = await sql`
     SELECT * FROM onenet_data 
     WHERE device_id = ${deviceId}
     ORDER BY timestamp DESC 
     LIMIT ${limit}
+    OFFSET ${offset}
   `
   return result
 }
 
 export async function getDataStats() {
-  const result = await sql`
-    SELECT 
-      COUNT(*) as total_records,
-      COUNT(DISTINCT device_id) as unique_devices,
-      COUNT(DISTINCT datastream_id) as unique_datastreams,
-      MAX(timestamp) as latest_timestamp
-    FROM onenet_data
-  `
-  return result[0]
+  return withCache(
+    'data_stats',
+    async () => {
+      const result = await sql`
+        SELECT 
+          COUNT(*) as total_records,
+          COUNT(DISTINCT device_id) as unique_devices,
+          COUNT(DISTINCT datastream_id) as unique_datastreams,
+          MAX(timestamp) as latest_timestamp
+        FROM onenet_data
+      `
+      return result[0]
+    },
+    60000 // 1分钟缓存
+  )
 }
 
 export async function getDataByTimeRange(
@@ -85,16 +124,22 @@ export async function getDataByDeviceAndTimeRange(
 }
 
 export async function getDevicesWithDatastreams() {
-  const result = await sql`
-    SELECT 
-      device_id,
-      raw_data->>'deviceName' as device_name,
-      array_agg(DISTINCT datastream_id) as datastreams,
-      COUNT(*) as total_records,
-      MAX(created_at) as latest_timestamp
-    FROM onenet_data 
-    GROUP BY device_id, raw_data->>'deviceName'
-    ORDER BY latest_timestamp DESC
-  `
-  return result
+  return withCache(
+    'devices_with_datastreams',
+    async () => {
+      const result = await sql`
+        SELECT 
+          device_id,
+          raw_data->>'deviceName' as device_name,
+          array_agg(DISTINCT datastream_id) as datastreams,
+          COUNT(*) as total_records,
+          MAX(created_at) as latest_timestamp
+        FROM onenet_data 
+        GROUP BY device_id, raw_data->>'deviceName'
+        ORDER BY latest_timestamp DESC
+      `
+      return result
+    },
+    120000 // 2分钟缓存
+  )
 }
