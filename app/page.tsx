@@ -145,212 +145,285 @@ export default function OneNetDashboard() {
     <>
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto space-y-6">
-        {/* 头部 */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">OneNet 数据监控</h1>
-            <p className="text-gray-600 mt-1 text-sm lg:text-base">实时监控来自OneNet平台的设备数据</p>
+          {/* 头部 */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                OneNet 数据监控
+              </h1>
+              <p className="text-gray-600 mt-1 text-sm lg:text-base">
+                实时监控来自OneNet平台的设备数据
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/promo" className="flex-1 sm:flex-none">
+                <Button
+                  variant="default"
+                  className="w-full sm:w-auto text-xs lg:text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  <Activity className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  产品介绍
+                </Button>
+              </Link>
+              <Link href="/analytics" className="flex-1 sm:flex-none">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto text-xs lg:text-sm"
+                >
+                  <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  <span className="hidden sm:inline">数据</span>分析
+                </Button>
+              </Link>
+              <Link href="/data" className="flex-1 sm:flex-none">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto text-xs lg:text-sm"
+                >
+                  <Database className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  <span className="hidden sm:inline">数据</span>查看
+                </Button>
+              </Link>
+              <Link href="/test-webhook" className="flex-1 sm:flex-none">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto text-xs lg:text-sm"
+                >
+                  <Activity className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  <span className="hidden sm:inline">测试</span>工具
+                </Button>
+              </Link>
+              <Button
+                onClick={fetchData}
+                disabled={refreshing}
+                className="flex-1 sm:flex-none w-full sm:w-auto text-xs lg:text-sm flex items-center justify-center gap-1 lg:gap-2"
+              >
+                <RefreshCw
+                  className={`w-3 h-3 lg:w-4 lg:h-4 ${
+                    refreshing ? "animate-spin" : ""
+                  }`}
+                />
+                刷新数据
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAdmin(!showAdmin)}
+                className="p-2"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/analytics" className="flex-1 sm:flex-none">
-              <Button variant="outline" className="w-full sm:w-auto text-xs lg:text-sm">
-                <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                <span className="hidden sm:inline">数据</span>分析
-              </Button>
-            </Link>
-            <Link href="/data" className="flex-1 sm:flex-none">
-              <Button variant="outline" className="w-full sm:w-auto text-xs lg:text-sm">
-                <Database className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                <span className="hidden sm:inline">数据</span>查看
-              </Button>
-            </Link>
-            <Link href="/test-webhook" className="flex-1 sm:flex-none">
-              <Button variant="outline" className="w-full sm:w-auto text-xs lg:text-sm">
-                <Activity className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                <span className="hidden sm:inline">测试</span>工具
-              </Button>
-            </Link>
-            <Button 
-              onClick={fetchData} 
-              disabled={refreshing} 
-              className="flex-1 sm:flex-none w-full sm:w-auto text-xs lg:text-sm flex items-center justify-center gap-1 lg:gap-2"
-            >
-              <RefreshCw className={`w-3 h-3 lg:w-4 lg:h-4 ${refreshing ? "animate-spin" : ""}`} />
-              刷新数据
-            </Button>
-            <Button 
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAdmin(!showAdmin)}
-              className="p-2"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
 
-        {/* 在统计卡片前添加数据库初始化提示 */}
-        {dbInitialized === false && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardHeader>
-              <CardTitle className="text-yellow-800 flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                数据库未初始化
-              </CardTitle>
-              <CardDescription className="text-yellow-700">
-                需要先初始化数据库表结构才能开始接收OneNet数据
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={initializeDatabase} disabled={initLoading} className="flex items-center gap-2">
-                {initLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    初始化中...
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-4 h-4" />
-                    初始化数据库
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 统计卡片 */}
-        {stats && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs lg:text-sm font-medium">总记录数</CardTitle>
-                <Database className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg lg:text-2xl font-bold">{stats.total_records.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs lg:text-sm font-medium">设备数量</CardTitle>
-                <Wifi className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg lg:text-2xl font-bold">{stats.unique_devices}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs lg:text-sm font-medium">数据流数量</CardTitle>
-                <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg lg:text-2xl font-bold">{stats.unique_datastreams}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow col-span-2 lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs lg:text-sm font-medium">最新数据时间</CardTitle>
-                <RefreshCw className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs lg:text-sm font-medium">
-                  {stats.latest_timestamp ? formatTimestamp(stats.latest_timestamp) : "暂无数据"}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* 数据列表和系统状态 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 数据列表 - 占据2/3宽度 */}
-          <div className="lg:col-span-2">
-            <Card>
+          {/* 在统计卡片前添加数据库初始化提示 */}
+          {dbInitialized === false && (
+            <Card className="border-yellow-200 bg-yellow-50">
               <CardHeader>
-                <CardTitle>最新数据</CardTitle>
-                <CardDescription>显示最近接收到的20条OneNet数据记录</CardDescription>
+                <CardTitle className="text-yellow-800 flex items-center gap-2">
+                  <Database className="w-5 h-5" />
+                  数据库未初始化
+                </CardTitle>
+                <CardDescription className="text-yellow-700">
+                  需要先初始化数据库表结构才能开始接收OneNet数据
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <LoadingCard loading={loading}>
-                  {data.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>暂无数据</p>
-                      <p className="text-sm mt-1">等待OneNet推送数据到 /api/onenet/webhook</p>
-                    </div>
+                <Button
+                  onClick={initializeDatabase}
+                  disabled={initLoading}
+                  className="flex items-center gap-2"
+                >
+                  {initLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      初始化中...
+                    </>
                   ) : (
-                    <div className="space-y-3">
-                      {(Array.isArray(data) ? data : []).map((item) => (
-                        <div key={item.id} className="border rounded-lg p-3 lg:p-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="text-xs">设备: {item.device_id}</Badge>
-                              <Badge variant="secondary" className="text-xs">数据流: {item.datastream_id}</Badge>
-                            </div>
-                            <span className="text-xs lg:text-sm text-gray-500">{formatTimestamp(item.timestamp)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs lg:text-sm text-gray-600">数值:</span>
-                              <span className={`text-lg lg:text-xl font-semibold ${getValueColor(item.value)}`}>
-                                {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
+                    <>
+                      <Database className="w-4 h-4" />
+                      初始化数据库
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 统计卡片 */}
+          {stats && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs lg:text-sm font-medium">
+                    总记录数
+                  </CardTitle>
+                  <Database className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg lg:text-2xl font-bold">
+                    {stats.total_records.toLocaleString()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs lg:text-sm font-medium">
+                    设备数量
+                  </CardTitle>
+                  <Wifi className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg lg:text-2xl font-bold">
+                    {stats.unique_devices}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs lg:text-sm font-medium">
+                    数据流数量
+                  </CardTitle>
+                  <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg lg:text-2xl font-bold">
+                    {stats.unique_datastreams}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-md transition-shadow col-span-2 lg:col-span-1">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs lg:text-sm font-medium">
+                    最新数据时间
+                  </CardTitle>
+                  <RefreshCw className="h-3 w-3 lg:h-4 lg:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xs lg:text-sm font-medium">
+                    {stats.latest_timestamp
+                      ? formatTimestamp(stats.latest_timestamp)
+                      : "暂无数据"}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* 数据列表和系统状态 */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 数据列表 - 占据2/3宽度 */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>最新数据</CardTitle>
+                  <CardDescription>
+                    显示最近接收到的20条OneNet数据记录
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LoadingCard loading={loading}>
+                    {data.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>暂无数据</p>
+                        <p className="text-sm mt-1">
+                          等待OneNet推送数据到 /api/onenet/webhook
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(Array.isArray(data) ? data : []).map((item) => (
+                          <div
+                            key={item.id}
+                            className="border rounded-lg p-3 lg:p-4 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  设备: {item.device_id}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  数据流: {item.datastream_id}
+                                </Badge>
+                              </div>
+                              <span className="text-xs lg:text-sm text-gray-500">
+                                {formatTimestamp(item.timestamp)}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-400">ID: {item.id}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs lg:text-sm text-gray-600">
+                                  数值:
+                                </span>
+                                <span
+                                  className={`text-lg lg:text-xl font-semibold ${getValueColor(
+                                    item.value
+                                  )}`}
+                                >
+                                  {typeof item.value === "number"
+                                    ? item.value.toLocaleString()
+                                    : item.value}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                ID: {item.id}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </LoadingCard>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 系统状态 - 占据1/3宽度 */}
-          <div className="lg:col-span-1">
-            <SystemHealth />
-          </div>
-        </div>
-
-        {/* 管理面板（可选显示） */}
-        {showAdmin && (
-          <AdminPanel />
-        )}
-
-        {/* API信息 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg lg:text-xl">API 配置信息</CardTitle>
-            <CardDescription>OneNet平台配置信息</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-                <span className="font-medium text-sm lg:text-base">Webhook URL:</span>
-                <code className="bg-gray-100 px-2 py-1 rounded text-xs lg:text-sm break-all">
-                  https://your-domain.vercel.app/api/onenet/webhook
-                </code>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm lg:text-base">请求方法:</span>
-                <Badge>POST</Badge>
-              </div>
-              <div className="text-xs lg:text-sm text-gray-600 mt-4">
-                <p>请在OneNet平台配置数据推送URL为上述地址，系统将自动接收并存储数据。</p>
-              </div>
+                        ))}
+                      </div>
+                    )}
+                  </LoadingCard>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* 系统状态 - 占据1/3宽度 */}
+            <div className="lg:col-span-1">
+              <SystemHealth />
+            </div>
+          </div>
+
+          {/* 管理面板（可选显示） */}
+          {showAdmin && <AdminPanel />}
+
+          {/* API信息 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg lg:text-xl">API 配置信息</CardTitle>
+              <CardDescription>OneNet平台配置信息</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+                  <span className="font-medium text-sm lg:text-base">
+                    Webhook URL:
+                  </span>
+                  <code className="bg-gray-100 px-2 py-1 rounded text-xs lg:text-sm break-all">
+                    https://your-domain.vercel.app/api/onenet/webhook
+                  </code>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm lg:text-base">
+                    请求方法:
+                  </span>
+                  <Badge>POST</Badge>
+                </div>
+                <div className="text-xs lg:text-sm text-gray-600 mt-4">
+                  <p>
+                    请在OneNet平台配置数据推送URL为上述地址，系统将自动接收并存储数据。
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-      
+
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </>
-  )
+  );
 }
