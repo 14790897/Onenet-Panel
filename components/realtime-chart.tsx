@@ -166,7 +166,7 @@ export function RealtimeChart({
                 <Tooltip 
                   labelFormatter={(value) => `时间: ${value}`}
                   formatter={(value: any, name: string) => [
-                    typeof value === 'number' ? value.toFixed(2) : value,
+                    typeof value === 'number' && !isNaN(value) ? value.toFixed(2) : value,
                     name
                   ]}
                 />

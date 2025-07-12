@@ -97,6 +97,22 @@ export default function AnalyticsPage() {
     setChartData([])
   }
 
+  // 安全的数值处理函数
+  const safeNumber = (value: any): number => {
+    if (typeof value === 'number' && !isNaN(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  }
+
+  // 安全的数值格式化函数
+  const safeToFixed = (value: any, digits: number = 2): string => {
+    const num = safeNumber(value);
+    return num.toFixed(digits);
+  }
+
   // 获取设备列表
   const fetchDevices = async () => {
     try {
@@ -419,7 +435,7 @@ export default function AnalyticsPage() {
                           <Tooltip 
                             labelFormatter={(value) => `时间: ${value}`}
                             formatter={(value: any, name: string) => [
-                              typeof value === 'number' ? value.toFixed(2) : value,
+                              safeToFixed(value, 2),
                               devices.find(d => d.device_id === name)?.device_name || name
                             ]}
                           />
@@ -454,18 +470,19 @@ export default function AnalyticsPage() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={selectedDevices.map(deviceId => {
                           const deviceData = chartData.filter(item => item[deviceId] != null)
-                          const average = deviceData.length > 0 
-                            ? deviceData.reduce((sum, item) => sum + (item[deviceId] || 0), 0) / deviceData.length
+                          const numericValues = deviceData.map(item => safeNumber(item[deviceId]))
+                          const average = numericValues.length > 0 
+                            ? numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length
                             : 0
-                          const max = Math.max(...deviceData.map(item => item[deviceId] || 0))
-                          const min = Math.min(...deviceData.map(item => item[deviceId] || 0))
+                          const max = numericValues.length > 0 ? Math.max(...numericValues) : 0
+                          const min = numericValues.length > 0 ? Math.min(...numericValues) : 0
                           
                           return {
                             device: devices.find(d => d.device_id === deviceId)?.device_name || deviceId,
                             deviceId,
-                            average: Number(average.toFixed(2)),
-                            max: Number(max.toFixed(2)),
-                            min: Number(min.toFixed(2)),
+                            average: safeNumber(average),
+                            max: safeNumber(max),
+                            min: safeNumber(min),
                             count: deviceData.length
                           }
                         })}>
@@ -480,7 +497,7 @@ export default function AnalyticsPage() {
                           <YAxis tick={{ fontSize: 12 }} />
                           <Tooltip 
                             formatter={(value: any, name: string) => [
-                              typeof value === 'number' ? value.toFixed(2) : value,
+                              safeToFixed(value, 2),
                               name === 'average' ? '平均值' : 
                               name === 'max' ? '最大值' : 
                               name === 'min' ? '最小值' : name
@@ -521,10 +538,12 @@ export default function AnalyticsPage() {
                             const deviceData = chartData.filter(item => item[deviceId] != null)
                             if (deviceData.length === 0) return null
 
-                            const values = deviceData.map(item => item[deviceId] || 0)
-                            const average = values.reduce((sum, val) => sum + val, 0) / values.length
-                            const max = Math.max(...values)
-                            const min = Math.min(...values)
+                            const numericValues = deviceData.map(item => safeNumber(item[deviceId]))
+                            const average = numericValues.length > 0 
+                              ? numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length 
+                              : 0
+                            const max = numericValues.length > 0 ? Math.max(...numericValues) : 0
+                            const min = numericValues.length > 0 ? Math.min(...numericValues) : 0
                             const range = max - min
 
                             return (
@@ -536,10 +555,10 @@ export default function AnalyticsPage() {
                                   <Badge variant="outline">{deviceId}</Badge>
                                 </td>
                                 <td className="p-2">{deviceData.length}</td>
-                                <td className="p-2 font-mono">{average.toFixed(2)}</td>
-                                <td className="p-2 font-mono text-red-600">{max.toFixed(2)}</td>
-                                <td className="p-2 font-mono text-blue-600">{min.toFixed(2)}</td>
-                                <td className="p-2 font-mono">{range.toFixed(2)}</td>
+                                <td className="p-2 font-mono">{safeToFixed(average)}</td>
+                                <td className="p-2 font-mono text-red-600">{safeToFixed(max)}</td>
+                                <td className="p-2 font-mono text-blue-600">{safeToFixed(min)}</td>
+                                <td className="p-2 font-mono">{safeToFixed(range)}</td>
                               </tr>
                             )
                           })}

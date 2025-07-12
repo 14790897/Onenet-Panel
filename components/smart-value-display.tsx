@@ -77,11 +77,14 @@ export function SmartValueDisplay({
   }, [deviceId, datastreamId, getColorSync, initialColor, hasAttemptedLoad]);
 
   const formatValue = (val: number): string => {
+    // 安全的数值格式化
+    const numVal = typeof val === 'number' && !isNaN(val) ? val : 0;
+    
     // 保留2位小数
-    if (Number.isInteger(val)) {
-      return val.toString();
+    if (Number.isInteger(numVal)) {
+      return numVal.toString();
     }
-    return parseFloat(val.toFixed(2)).toString();
+    return parseFloat(numVal.toFixed(2)).toString();
   };
 
   const getTooltipContent = () => {
@@ -159,7 +162,7 @@ export function SimpleValueDisplay({
   
   return (
     <span className={`font-semibold ${colorClass} ${className}`}>
-      {typeof value === "number" ? (
+      {typeof value === "number" && !isNaN(value) ? (
         Number.isInteger(value) ? value.toString() : parseFloat(value.toFixed(2)).toString()
       ) : value}
     </span>
