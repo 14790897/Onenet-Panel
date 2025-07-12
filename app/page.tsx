@@ -30,7 +30,7 @@ interface DataStats {
 }
 
 export default function OneNetDashboard() {
-  const [data, setData] = useState<OneNetDataItem[]>([])
+  const [data, setData] = useState<OneNetDataItem[]>([]) // 确保初始化为空数组
   const [stats, setStats] = useState<DataStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -46,17 +46,24 @@ export default function OneNetDashboard() {
 
       // 获取最新数据
       const dataResponse = await fetch("/api/data?type=latest&limit=20")
+      if (!dataResponse.ok) {
+        throw new Error(`HTTP ${dataResponse.status}: ${dataResponse.statusText}`)
+      }
       const dataResult = await dataResponse.json()
 
       // 获取统计信息
       const statsResponse = await fetch("/api/data?type=stats")
+      if (!statsResponse.ok) {
+        throw new Error(`HTTP ${statsResponse.status}: ${statsResponse.statusText}`)
+      }
       const statsResult = await statsResponse.json()
 
-      if (dataResult.success) {
+      if (dataResult.success && Array.isArray(dataResult.data)) {
         setData(dataResult.data)
         success(`刷新成功，获取到 ${dataResult.data.length} 条数据`)
       } else {
-        error("获取数据失败：" + dataResult.error)
+        setData([]) // 确保 data 始终是数组
+        error("获取数据失败：" + (dataResult.error || "数据格式错误"))
       }
 
       if (statsResult.success) {
@@ -66,6 +73,7 @@ export default function OneNetDashboard() {
       }
     } catch (err) {
       console.error("Error fetching data:", err)
+      setData([]) // 确保 data 始终是数组
       error("网络请求失败，请检查连接")
     } finally {
       setLoading(false)
@@ -277,7 +285,7 @@ export default function OneNetDashboard() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {data.map((item) => (
+                      {(Array.isArray(data) ? data : []).map((item) => (
                         <div key={item.id} className="border rounded-lg p-3 lg:p-4 hover:bg-gray-50 transition-colors">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                             <div className="flex flex-wrap items-center gap-2">

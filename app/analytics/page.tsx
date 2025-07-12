@@ -39,10 +39,10 @@ interface DeviceInfo {
 }
 
 export default function AnalyticsPage() {
-  const [devices, setDevices] = useState<DeviceInfo[]>([])
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([])
+  const [devices, setDevices] = useState<DeviceInfo[]>([]) // 确保初始化为空数组
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]) // 确保初始化为空数组
   const [selectedDatastream, setSelectedDatastream] = useState<string>("")
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]) // 确保初始化为空数组
   const [loading, setLoading] = useState(false)
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: addDays(new Date(), -7),
@@ -55,10 +55,19 @@ export default function AnalyticsPage() {
       const response = await fetch('/api/analytics/devices')
       if (response.ok) {
         const data = await response.json()
-        setDevices(data)
+        if (Array.isArray(data)) {
+          setDevices(data)
+        } else {
+          setDevices([]) // 确保始终为数组
+          console.error('设备列表数据格式错误:', data)
+        }
+      } else {
+        setDevices([]) // 确保始终为数组
+        console.error('获取设备列表失败，状态码:', response.status)
       }
     } catch (error) {
       console.error('获取设备列表失败:', error)
+      setDevices([]) // 确保始终为数组
     }
   }
 
@@ -80,10 +89,19 @@ export default function AnalyticsPage() {
       const response = await fetch(`/api/analytics/comparison?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setChartData(data)
+        if (Array.isArray(data)) {
+          setChartData(data)
+        } else {
+          setChartData([]) // 确保始终为数组
+          console.error('对比数据格式错误:', data)
+        }
+      } else {
+        setChartData([]) // 确保始终为数组
+        console.error('获取对比数据失败，状态码:', response.status)
       }
     } catch (error) {
       console.error('获取对比数据失败:', error)
+      setChartData([]) // 确保始终为数组
     } finally {
       setLoading(false)
     }
@@ -101,9 +119,13 @@ export default function AnalyticsPage() {
   // 获取所有可用的数据流
   const getAllDatastreams = () => {
     const datastreams = new Set<string>()
-    devices.forEach(device => {
-      device.datastreams.forEach(ds => datastreams.add(ds))
-    })
+    if (Array.isArray(devices)) {
+      devices.forEach(device => {
+        if (device.datastreams && Array.isArray(device.datastreams)) {
+          device.datastreams.forEach(ds => datastreams.add(ds))
+        }
+      })
+    }
     return Array.from(datastreams)
   }
 
