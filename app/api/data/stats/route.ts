@@ -31,51 +31,63 @@ async function getDatastreamStats(deviceId: string, datastreamId: string) {
   try {
     // 查询该数据流的统计信息
     const result = await sql`
-      SELECT 
-        MIN(CAST(value AS NUMERIC)) as min_value,
-        MAX(CAST(value AS NUMERIC)) as max_value,
-        AVG(CAST(value AS NUMERIC)) as avg_value,
+      SELECT
+        MIN(value) as min_value,
+        MAX(value) as max_value,
+        AVG(value) as avg_value,
         COUNT(*) as total_count,
         MIN(created_at) as first_record,
         MAX(created_at) as last_record
-      FROM onenet_data 
-      WHERE device_id = ${deviceId} 
+      FROM onenet_data
+      WHERE device_id = ${deviceId}
         AND datastream_id = ${datastreamId}
-        AND value ~ '^-?[0-9]+\.?[0-9]*$'
+        AND value IS NOT NULL
+        AND value != 'NaN'
     `;
 
     if (result.length === 0 || result[0].total_count === 0) {
-      return NextResponse.json({
-        success: false,
-        error: '未找到该数据流的数值数据'
-      }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "未找到该数据流的数值数据",
+        },
+        { status: 404 }
+      );
     }
 
     const stats = result[0];
 
+    // 安全地转换数值
+    const minValue = stats.min_value !== null ? Number(stats.min_value) : 0;
+    const maxValue = stats.max_value !== null ? Number(stats.max_value) : 0;
+    const avgValue = stats.avg_value !== null ? Number(stats.avg_value) : 0;
+    const totalCount =
+      stats.total_count !== null ? Number(stats.total_count) : 0;
+
     return NextResponse.json({
       success: true,
       stats: {
-        min: parseFloat(stats.min_value),
-        max: parseFloat(stats.max_value),
-        avg: parseFloat(stats.avg_value),
-        count: parseInt(stats.total_count),
+        min: minValue,
+        max: maxValue,
+        avg: avgValue,
+        count: totalCount,
         firstRecord: stats.first_record,
         lastRecord: stats.last_record,
-        range: parseFloat(stats.max_value) - parseFloat(stats.min_value)
+        range: maxValue - minValue,
       },
       metadata: {
         deviceId,
         datastreamId,
-        queryTime: new Date().toISOString()
-      }
+        queryTime: new Date().toISOString(),
+      },
     });
 
   } catch (error) {
     console.error('获取数据流统计失败:', error);
     return NextResponse.json({
       success: false,
-      error: '服务器内部错误'
+      error: '服务器内部错误',
+      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
     }, { status: 500 });
   }
 }
