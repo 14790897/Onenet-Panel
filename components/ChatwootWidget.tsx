@@ -22,7 +22,7 @@ export default function ChatwootWidget() {
       script.onload = function() {
         if (window.chatwootSDK) {
           window.chatwootSDK.run({
-            websiteToken: "tjd9GhUiQ8Mqei285ueJZEvE",
+            websiteToken: "CUxigAid6rAS6eXoEu2sRa7Y",
             baseUrl: BASE_URL,
           });
         }
