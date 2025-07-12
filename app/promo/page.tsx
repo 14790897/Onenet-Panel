@@ -113,35 +113,43 @@ export default function PromoPage() {
       name: "张明",
       company: "智能制造科技",
       role: "CTO",
-      content: "OneNet平台帮助我们实现了工厂设备的智能化管理，生产效率提升了30%。数据可视化功能特别棒！",
+      content:
+        "OneNet平台帮助我们实现了工厂设备的智能化管理，生产效率提升了30%。数据可视化功能特别棒！",
       rating: 5,
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
+      avatar:
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
     },
     {
       name: "李华",
       company: "绿色能源集团",
       role: "技术总监",
-      content: "数据处理速度非常快，界面简洁易用，团队很快就上手了。客服响应也很及时。",
+      content:
+        "数据处理速度非常快，界面简洁易用，团队很快就上手了。客服响应也很及时。",
       rating: 5,
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"
+      avatar:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
     },
     {
       name: "王芳",
       company: "智慧城市解决方案",
       role: "产品经理",
-      content: "客服响应及时，技术支持专业，是我们信赖的合作伙伴。API文档也很详细。",
+      content:
+        "客服响应及时，技术支持专业，是我们信赖的合作伙伴。API文档也很详细。",
       rating: 5,
-      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b526?w=100&h=100&fit=crop&crop=face"
+      avatar:
+        "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100&h=100&fit=crop&crop=faces",
     },
     {
       name: "陈刚",
       company: "农业科技创新",
       role: "研发总监",
-      content: "帮助我们实现了农业设备的远程监控，大大降低了运营成本，提高了管理效率。",
+      content:
+        "帮助我们实现了农业设备的远程监控，大大降低了运营成本，提高了管理效率。",
       rating: 5,
-      avatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&crop=face"
-    }
-  ]
+      avatar:
+        "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&crop=face",
+    },
+  ];
 
   if (!mounted) {
     return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50" />
