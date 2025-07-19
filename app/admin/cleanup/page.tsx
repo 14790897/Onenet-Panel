@@ -18,6 +18,16 @@ interface DatabaseStats {
   table_size: string
 }
 
+interface AutoCompressionStats {
+  originalRecords: number
+  compressedRecords: number
+  lastCompressionTime: string | null
+  nextCompressionTime: string
+  compressionInterval: string
+  compressionDelay: string
+  compressionGranularity: string
+}
+
 interface CleanupPreview {
   totalRecords: number
   recordsToDelete: number
@@ -29,6 +39,7 @@ interface CleanupPreview {
 
 export default function DatabaseCleanupPage() {
   const [stats, setStats] = useState<DatabaseStats | null>(null)
+  const [autoStats, setAutoStats] = useState<AutoCompressionStats | null>(null)
   const [preview, setPreview] = useState<CleanupPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [days, setDays] = useState(30)
@@ -39,6 +50,7 @@ export default function DatabaseCleanupPage() {
 
   useEffect(() => {
     fetchStats()
+    fetchAutoCompressionStats()
   }, [])
 
   const fetchStats = async () => {
@@ -50,6 +62,18 @@ export default function DatabaseCleanupPage() {
       }
     } catch (error) {
       console.error('获取统计失败:', error)
+    }
+  }
+
+  const fetchAutoCompressionStats = async () => {
+    try {
+      const response = await fetch('/api/admin/auto-compression')
+      const data = await response.json()
+      if (data.success) {
+        setAutoStats(data.stats)
+      }
+    } catch (error) {
+      console.error('获取自动压缩统计失败:', error)
     }
   }
 
@@ -155,6 +179,85 @@ export default function DatabaseCleanupPage() {
             </div>
           ) : (
             <div>加载统计信息中...</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 自动压缩状态 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            自动压缩状态
+          </CardTitle>
+          <CardDescription>每30分钟自动压缩30分钟前的数据</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {autoStats ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-blue-600">{autoStats.originalRecords.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">原始记录</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-green-600">{autoStats.compressedRecords.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">压缩记录</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-medium">
+                    {autoStats.lastCompressionTime
+                      ? new Date(autoStats.lastCompressionTime).toLocaleString()
+                      : '未执行'
+                    }
+                  </div>
+                  <div className="text-sm text-gray-600">上次压缩</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-medium">
+                    {new Date(autoStats.nextCompressionTime).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600">下次压缩</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded border">
+                <div className="text-sm space-y-1">
+                  <div><strong>压缩策略:</strong> {autoStats.compressionGranularity}聚合</div>
+                  <div><strong>压缩延迟:</strong> {autoStats.compressionDelay}</div>
+                  <div><strong>检查间隔:</strong> {autoStats.compressionInterval}</div>
+                </div>
+              </div>
+
+              <Button
+                onClick={async () => {
+                  setLoading(true)
+                  try {
+                    const response = await fetch('/api/admin/auto-compression?action=manual_compress', {
+                      method: 'POST'
+                    })
+                    const data = await response.json()
+                    if (data.success) {
+                      setMessage({ type: 'success', text: data.message })
+                      fetchStats()
+                      fetchAutoCompressionStats()
+                    } else {
+                      setMessage({ type: 'error', text: data.error })
+                    }
+                  } catch (error) {
+                    setMessage({ type: 'error', text: '手动压缩失败' })
+                  }
+                  setLoading(false)
+                }}
+                disabled={loading}
+                variant="outline"
+                className="w-full"
+              >
+                {loading ? '压缩中...' : '手动触发压缩'}
+              </Button>
+            </div>
+          ) : (
+            <div>加载自动压缩状态中...</div>
           )}
         </CardContent>
       </Card>

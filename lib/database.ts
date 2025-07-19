@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless"
 import { withCache, generateCacheKey } from "./cache"
+import { checkAndCompress } from "./auto-compression"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -19,6 +20,12 @@ export async function insertOneNetData(data: OneNetData) {
     VALUES (${data.device_id}, ${data.datastream_id}, ${data.value}, ${JSON.stringify(data.raw_data)})
     RETURNING *
   `
+
+  // 异步触发自动压缩检查（不阻塞数据插入）
+  checkAndCompress().catch(error => {
+    console.error('自动压缩检查失败:', error)
+  })
+
   return result[0]
 }
 
