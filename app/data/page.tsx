@@ -30,6 +30,7 @@ export default function DataView() {
   const [selectedDatastream, setSelectedDatastream] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<string>("all")
   const [availableDatastreams, setAvailableDatastreams] = useState<string[]>([])
+  const [showCompressed, setShowCompressed] = useState<boolean>(false)
 
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1)
