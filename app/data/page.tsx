@@ -193,11 +193,7 @@ export default function DataView() {
   const handleDatastreamChange = (datastream: string) => {
     setSelectedDatastream(datastream);
     setCurrentPage(1); // 重置到第一页
-    if (activeTab === "all") {
-      fetchData(1, pageSize);
-    } else if (selectedDevice) {
-      fetchDeviceData(selectedDevice, 1, pageSize);
-    }
+    // 不在这里立即调用fetchData，让useEffect处理
   };
 
   const refreshData = () => {
@@ -456,7 +452,7 @@ export default function DataView() {
           value={activeTab}
           onValueChange={(value) => {
             setActiveTab(value);
-            savePreferences({ activeTab: value, selectedDevice });
+            savePreferences({ activeTab: value, selectedDevice: selectedDevice || undefined });
           }}
           className="w-full"
         >
@@ -495,45 +491,45 @@ export default function DataView() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full table-auto">
+                    <table className="w-full table-auto text-sm">
                       <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2">设备ID</th>
-                          <th className="text-left p-2">数据流ID</th>
-                          <th className="text-left p-2">数值</th>
-                          <th className="text-left p-2">额外信息</th>
-                          <th className="text-left p-2">接收时间</th>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left px-2 py-1 font-medium">设备ID</th>
+                          <th className="text-left px-2 py-1 font-medium">数据流</th>
+                          <th className="text-left px-2 py-1 font-medium">数值</th>
+                          <th className="text-left px-2 py-1 font-medium">额外信息</th>
+                          <th className="text-left px-2 py-1 font-medium">时间</th>
                         </tr>
                       </thead>
                       <tbody>
                         {data.map((record) => (
                           <tr
                             key={record.id}
-                            className="border-b hover:bg-gray-50"
+                            className="border-b hover:bg-gray-50/50"
                           >
-                            <td className="p-2">
-                              <Badge variant="outline">
+                            <td className="px-2 py-1">
+                              <Badge variant="outline" className="text-xs">
                                 {record.device_id}
                               </Badge>
                             </td>
-                            <td className="p-2">
-                              <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                            <td className="px-2 py-1">
+                              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
                                 {record.datastream_id}
                               </code>
                             </td>
-                            <td className="p-2">
+                            <td className="px-2 py-1">
                               <SmartValueDisplay
                                 value={getDisplayValue(record)}
                                 deviceId={record.device_id}
                                 datastreamId={record.datastream_id}
-                                className="font-mono"
+                                className="font-mono text-sm"
                                 showTooltip={true}
                               />
                             </td>
-                            <td className="p-2 text-sm text-gray-600 max-w-xs">
+                            <td className="px-2 py-1 text-xs text-gray-600 max-w-xs">
                               {formatRawData(record.raw_data)}
                             </td>
-                            <td className="p-2 text-sm">
+                            <td className="px-2 py-1 text-xs text-gray-500">
                               {formatTimestamp(record.created_at)}
                             </td>
                           </tr>
@@ -611,36 +607,38 @@ export default function DataView() {
                     <p>该设备暂无数据记录</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {data.map((record) => (
                       <div
                         key={record.id}
-                        className="border rounded-lg p-4 hover:bg-gray-50"
+                        className="border rounded-md p-3 hover:bg-gray-50/50 text-sm"
                       >
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex justify-between items-center mb-1">
                           <div className="flex items-center gap-2">
-                            <Badge>{record.device_id}</Badge>
-                            <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                            <Badge variant="outline" className="text-xs">
+                              {record.device_id}
+                            </Badge>
+                            <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
                               {record.datastream_id}
                             </code>
                             <SmartValueDisplay
                               value={getDisplayValue(record)}
                               deviceId={record.device_id}
                               datastreamId={record.datastream_id}
-                              className="font-mono text-lg"
+                              className="font-mono text-sm font-medium"
                               showTooltip={true}
                             />
                           </div>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-xs text-gray-500">
                             {formatTimestamp(record.created_at)}
                           </span>
                         </div>
                         {record.raw_data && (
-                          <details className="text-sm">
-                            <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
-                              查看原始数据
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-gray-600 hover:text-gray-800 py-1">
+                              原始数据
                             </summary>
-                            <pre className="mt-2 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                            <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
                               {JSON.stringify(record.raw_data, null, 2)}
                             </pre>
                           </details>

@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
         let totalCount = undefined
         if (offset === 0) {
           try {
-            const { sql } = await import('@vercel/postgres')
+            const { neon } = await import('@neondatabase/serverless')
+            const sql = neon(process.env.DATABASE_URL!)
             let countQuery
             if (deviceId && datastream) {
               countQuery = await sql`SELECT COUNT(*) as total FROM onenet_data WHERE device_id = ${deviceId} AND datastream_id = ${datastream}`
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
             } else {
               countQuery = await sql`SELECT COUNT(*) as total FROM onenet_data`
             }
-            totalCount = parseInt(countQuery.rows[0].total)
+            totalCount = parseInt(countQuery[0].total)
           } catch (error) {
             console.error('获取总数失败:', error)
           }

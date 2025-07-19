@@ -30,32 +30,32 @@ export async function getLatestData(
 ) {
   if (deviceId && datastream) {
     const result = await sql`
-      SELECT * FROM onenet_data 
+      SELECT * FROM onenet_data
       WHERE device_id = ${deviceId} AND datastream_id = ${datastream}
-      ORDER BY timestamp DESC 
+      ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `
     return result
   } else if (deviceId) {
     const result = await sql`
-      SELECT * FROM onenet_data 
+      SELECT * FROM onenet_data
       WHERE device_id = ${deviceId}
-      ORDER BY timestamp DESC 
+      ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `
     return result
   } else if (datastream) {
     const result = await sql`
-      SELECT * FROM onenet_data 
+      SELECT * FROM onenet_data
       WHERE datastream_id = ${datastream}
-      ORDER BY timestamp DESC 
+      ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `
     return result
   } else {
     const result = await sql`
-      SELECT * FROM onenet_data 
-      ORDER BY timestamp DESC 
+      SELECT * FROM onenet_data
+      ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `
     return result
