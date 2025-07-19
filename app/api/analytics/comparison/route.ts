@@ -4,6 +4,35 @@ import { smartQueryDeviceData, getDataSourceInfo } from "@/lib/smart-data-reader
 
 const sql = neon(process.env.DATABASE_URL!)
 
+// 将采样间隔转换为数据间隔格式
+function convertSamplingIntervalToDataInterval(samplingInterval: string, startDate: string, endDate: string): string {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
+
+  switch (samplingInterval) {
+    case 'minute':
+      // 根据时间范围选择合适的分钟间隔
+      if (durationHours <= 1) return '1m'
+      if (durationHours <= 6) return '5m'
+      if (durationHours <= 24) return '15m'
+      return '30m'
+
+    case 'hour':
+      // 根据时间范围选择合适的小时间隔
+      if (durationHours <= 48) return '1h'
+      if (durationHours <= 168) return '3h'
+      return '6h'
+
+    case 'day':
+      return '1d'
+
+    default:
+      // 如果是具体的间隔值，直接返回
+      return samplingInterval
+  }
+}
+
 // 计算采样策略
 function calculateSamplingStrategy(startDate: string, endDate: string, interval: string) {
   const start = new Date(startDate)
@@ -220,6 +249,17 @@ export async function GET(request: NextRequest) {
     // 根据间隔和时间范围计算采样策略
     const samplingInfo = calculateSamplingStrategy(startDate, endDate, interval)
 
+    // 将采样间隔转换为智能数据读取器可识别的格式
+    const effectiveInterval = convertSamplingIntervalToDataInterval(samplingInfo.samplingInterval, startDate, endDate)
+
+    console.log('📊 采样策略:', {
+      originalInterval: interval,
+      samplingInterval: samplingInfo.samplingInterval,
+      effectiveInterval,
+      maxPoints: samplingInfo.maxPoints,
+      timeRange: { startDate, endDate }
+    })
+
     // 使用智能数据读取器获取数据
     const data = await smartQueryDeviceData({
       devices,
@@ -227,7 +267,7 @@ export async function GET(request: NextRequest) {
       startDate,
       endDate,
       limit: samplingInfo.maxPoints,
-      interval
+      interval: effectiveInterval
     })
 
     // 获取数据源信息（用于调试）

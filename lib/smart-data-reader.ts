@@ -42,22 +42,29 @@ export class SmartDataReader {
    * 决定使用哪个数据源
    */
   static determineDataSource(startDate: string, endDate: string): DataSource {
+    // 暂时禁用压缩数据，直到数据库连接问题解决
+    // TODO: 重新启用压缩数据功能
+    console.log('⚠️ 暂时使用原始数据源，跳过压缩数据')
+    return 'original'
+
+    /* 原始逻辑（暂时注释）
     const now = Date.now()
     const start = new Date(startDate).getTime()
     const end = new Date(endDate).getTime()
-    
+
     // 如果查询范围完全在压缩阈值之前，使用压缩数据
     if (end < now - this.COMPRESSION_THRESHOLD) {
       return 'compressed'
     }
-    
+
     // 如果查询范围完全在压缩阈值之后，使用原始数据
     if (start >= now - this.COMPRESSION_THRESHOLD) {
       return 'original'
     }
-    
+
     // 如果查询范围跨越压缩阈值，使用混合模式
     return 'mixed'
+    */
   }
 
   /**
@@ -73,12 +80,17 @@ export class SmartDataReader {
           return await this.queryOriginalData(params)
         case 'compressed':
           // 尝试查询压缩数据，如果失败则回退到原始数据
-          const compressedData = await this.queryCompressedData(params)
-          if (compressedData.length === 0) {
-            console.log('⚠️ 压缩数据为空，回退到原始数据')
+          try {
+            const compressedData = await this.queryCompressedData(params)
+            if (compressedData.length === 0) {
+              console.log('⚠️ 压缩数据为空，回退到原始数据')
+              return await this.queryOriginalData(params)
+            }
+            return compressedData
+          } catch (error) {
+            console.warn('⚠️ 压缩数据查询失败，回退到原始数据:', error instanceof Error ? error.message : String(error))
             return await this.queryOriginalData(params)
           }
-          return compressedData
         case 'mixed':
           return await this.queryMixedData(params)
         default:
@@ -140,6 +152,39 @@ export class SmartDataReader {
   }
 
   /**
+   * 确保压缩数据表存在
+   */
+  private static async ensureCompressedTableExists(): Promise<boolean> {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS onenet_data_compressed (
+          id SERIAL PRIMARY KEY,
+          device_id VARCHAR(50),
+          datastream_id VARCHAR(100),
+          avg_value NUMERIC,
+          min_value NUMERIC,
+          max_value NUMERIC,
+          sample_count INTEGER,
+          time_bucket TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(device_id, datastream_id, time_bucket)
+        )
+      `
+
+      // 创建索引以提高查询性能
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_compressed_device_datastream_time
+        ON onenet_data_compressed (device_id, datastream_id, time_bucket)
+      `
+
+      return true
+    } catch (error) {
+      console.error('❌ 创建压缩数据表失败:', error)
+      return false
+    }
+  }
+
+  /**
    * 查询压缩数据
    */
   private static async queryCompressedData(params: QueryParams): Promise<DataPoint[]> {
@@ -147,6 +192,13 @@ export class SmartDataReader {
 
     try {
       console.log('🗜️ 查询压缩数据:', { devices, datastream, startDate, endDate, limit })
+
+      // 确保压缩表存在
+      const tableExists = await this.ensureCompressedTableExists()
+      if (!tableExists) {
+        console.warn('⚠️ 压缩数据表不存在且创建失败，跳过压缩数据查询')
+        return []
+      }
 
       const data = await sql`
         SELECT
@@ -192,24 +244,42 @@ export class SmartDataReader {
   private static async queryMixedData(params: QueryParams): Promise<DataPoint[]> {
     const now = Date.now()
     const compressionBoundary = new Date(now - this.COMPRESSION_THRESHOLD).toISOString()
-    
+
+    let compressedData: DataPoint[] = []
+    let originalData: DataPoint[] = []
+
     // 查询压缩数据（较早的数据）
-    const compressedParams = {
-      ...params,
-      endDate: compressionBoundary
+    try {
+      const compressedParams = {
+        ...params,
+        endDate: compressionBoundary
+      }
+      compressedData = await this.queryCompressedData(compressedParams)
+    } catch (error) {
+      console.warn('⚠️ 混合查询中压缩数据失败:', error instanceof Error ? error.message : String(error))
     }
-    const compressedData = await this.queryCompressedData(compressedParams)
-    
+
     // 查询原始数据（较新的数据）
-    const originalParams = {
-      ...params,
-      startDate: compressionBoundary
+    try {
+      const originalParams = {
+        ...params,
+        startDate: compressionBoundary
+      }
+      originalData = await this.queryOriginalData(originalParams)
+    } catch (error) {
+      console.warn('⚠️ 混合查询中原始数据失败:', error instanceof Error ? error.message : String(error))
+      // 如果原始数据也失败，尝试查询整个时间范围的原始数据
+      try {
+        console.log('🔄 尝试查询整个时间范围的原始数据作为回退')
+        originalData = await this.queryOriginalData(params)
+      } catch (fallbackError) {
+        console.error('❌ 回退查询也失败:', fallbackError instanceof Error ? fallbackError.message : String(fallbackError))
+      }
     }
-    const originalData = await this.queryOriginalData(originalParams)
-    
+
     // 合并数据并排序
     const allData = [...compressedData, ...originalData]
-    return allData.sort((a, b) => 
+    return allData.sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )
   }
