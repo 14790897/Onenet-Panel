@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { smartQueryDeviceData, getDataSourceInfo } from "@/lib/smart-data-reader"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -219,15 +220,28 @@ export async function GET(request: NextRequest) {
     // 根据间隔和时间范围计算采样策略
     const samplingInfo = calculateSamplingStrategy(startDate, endDate, interval)
 
-    // 数据库层面的时间间隔查询
-    const data = await executeIntervalQuery(devices, datastream, startDate, endDate, samplingInfo)
+    // 使用智能数据读取器获取数据
+    const data = await smartQueryDeviceData({
+      devices,
+      datastream,
+      startDate,
+      endDate,
+      limit: samplingInfo.maxPoints,
+      interval
+    })
+
+    // 获取数据源信息（用于调试）
+    const dataSourceInfo = await getDataSourceInfo(startDate, endDate)
+    console.log('📊 数据源信息:', dataSourceInfo)
 
     // 按时间点组织数据
     const timeMap = new Map()
 
     data.forEach(row => {
-      const timeKey = new Date(row.time_bucket).toISOString()
-      const timeDisplay = new Date(row.time_bucket).toLocaleString('zh-CN', {
+      // 使用 time_bucket 如果存在，否则使用 created_at
+      const timeValue = row.time_bucket || row.created_at
+      const timeKey = new Date(timeValue).toISOString()
+      const timeDisplay = new Date(timeValue).toLocaleString('zh-CN', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -237,7 +251,8 @@ export async function GET(request: NextRequest) {
       if (!timeMap.has(timeKey)) {
         timeMap.set(timeKey, {
           timestamp: timeKey,
-          time: timeDisplay
+          time: timeDisplay,
+          dataSource: row.data_source // 添加数据源信息
         })
       }
 

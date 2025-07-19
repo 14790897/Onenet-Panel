@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
+import { smartQueryDeviceData, getDataSourceInfo } from "@/lib/smart-data-reader"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -42,25 +43,22 @@ export async function GET(request: NextRequest) {
         startTime = new Date(now.getTime() - 60 * 60 * 1000) // 默认1小时
     }
 
-    // 获取指定时间范围内的数据
-    const data = await sql`
-      SELECT
-        device_id,
-        datastream_id,
-        value,
-        created_at,
-        raw_data->>'deviceName' as device_name
-      FROM onenet_data
-      WHERE device_id = ANY(${devices})
-        AND datastream_id = ${datastream}
-        AND created_at >= ${startTime.toISOString()}
-      ORDER BY created_at DESC
-      LIMIT ${limit * devices.length}
-    `
+    // 使用智能数据读取器获取数据
+    const data = await smartQueryDeviceData({
+      devices,
+      datastream,
+      startDate: startTime.toISOString(),
+      endDate: new Date().toISOString(),
+      limit: limit * devices.length
+    })
+
+    // 获取数据源信息（用于调试）
+    const dataSourceInfo = await getDataSourceInfo(startTime.toISOString(), new Date().toISOString())
+    console.log('📊 实时数据源信息:', dataSourceInfo)
 
     // 按时间点组织数据
     const timeMap = new Map()
-    
+
     data.forEach(row => {
       const timeKey = new Date(row.created_at).toISOString()
 
@@ -68,7 +66,8 @@ export async function GET(request: NextRequest) {
         timeMap.set(timeKey, {
           timestamp: timeKey,
           // 不在服务器端格式化时间，让客户端处理
-          rawTimestamp: row.created_at
+          rawTimestamp: row.created_at,
+          dataSource: row.data_source // 添加数据源信息
         })
       }
 
