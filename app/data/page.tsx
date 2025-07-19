@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RefreshCw, Database, TrendingUp, Activity, Settings, RotateCcw } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { RefreshCw, Database, TrendingUp, Activity, Settings, RotateCcw, Filter } from "lucide-react"
 import { SmartValueDisplay } from "@/components/smart-value-display"
 import { Pagination } from "@/components/pagination"
 import { useDataViewPreferences } from "@/lib/data-view-preferences"
@@ -24,8 +26,10 @@ export default function DataView() {
   const [data, setData] = useState<OneNetDataRecord[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<string>("");
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
+  const [selectedDatastream, setSelectedDatastream] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<string>("all")
+  const [availableDatastreams, setAvailableDatastreams] = useState<string[]>([])
 
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1)
@@ -61,6 +65,11 @@ export default function DataView() {
         offset: offset.toString()
       });
 
+      // 添加数据流过滤
+      if (selectedDatastream && selectedDatastream !== 'all') {
+        params.append('datastream', selectedDatastream);
+      }
+
       const response = await fetch(`/api/data?${params}`);
       if (response.ok) {
         const result = await response.json();
@@ -72,6 +81,10 @@ export default function DataView() {
           if (result.pagination?.totalCount !== undefined) {
             setTotalItems(result.pagination.totalCount);
           }
+
+          // 提取可用的数据流
+          const datastreams = Array.from(new Set(result.data.map((item: OneNetDataRecord) => item.datastream_id))) as string[];
+          setAvailableDatastreams(datastreams);
         } else {
           setData([]); // 确保始终为数组
           console.error("获取数据失败:", result.error || "数据格式错误");
@@ -102,6 +115,23 @@ export default function DataView() {
     }
   };
 
+  const fetchDatastreams = async (deviceId?: string) => {
+    try {
+      const params = deviceId ? `?device_id=${deviceId}` : '';
+      const response = await fetch(`/api/data/datastreams${params}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setAvailableDatastreams(result.datastreams);
+        }
+      } else {
+        console.error("获取数据流失败，状态码:", response.status);
+      }
+    } catch (error) {
+      console.error("获取数据流失败:", error);
+    }
+  };
+
   const fetchDeviceData = async (deviceId: string, page = 1, size = pageSize) => {
     try {
       setLoading(true);
@@ -112,6 +142,11 @@ export default function DataView() {
         limit: size.toString(),
         offset: offset.toString()
       });
+
+      // 添加数据流过滤
+      if (selectedDatastream && selectedDatastream !== 'all') {
+        params.append('datastream', selectedDatastream);
+      }
 
       const response = await fetch(`/api/data?${params}`);
       if (response.ok) {
@@ -155,6 +190,16 @@ export default function DataView() {
     }
   };
 
+  const handleDatastreamChange = (datastream: string) => {
+    setSelectedDatastream(datastream);
+    setCurrentPage(1); // 重置到第一页
+    if (activeTab === "all") {
+      fetchData(1, pageSize);
+    } else if (selectedDevice) {
+      fetchDeviceData(selectedDevice, 1, pageSize);
+    }
+  };
+
   const refreshData = () => {
     if (activeTab === "all") {
       fetchData(currentPage, pageSize);
@@ -169,11 +214,13 @@ export default function DataView() {
 
     if (selectedDevice && activeTab === "device") {
       fetchDeviceData(selectedDevice, 1, pageSize);
+      fetchDatastreams(selectedDevice);
     } else {
       fetchData(1, pageSize);
+      fetchDatastreams();
     }
     fetchStats();
-  }, [preferencesLoaded, selectedDevice, activeTab]);
+  }, [preferencesLoaded, selectedDevice, activeTab, selectedDatastream]);
 
   // 保存用户偏好设置
   const saveCurrentPreferences = () => {
@@ -187,6 +234,7 @@ export default function DataView() {
   const resetPreferences = () => {
     clearPreferences();
     setSelectedDevice("");
+    setSelectedDatastream("all");
     setActiveTab("all");
     setCurrentPage(1);
     fetchData(1, pageSize);
@@ -364,6 +412,45 @@ export default function DataView() {
             </Card>
           </div>
         )}
+
+        {/* 数据流过滤器 */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-gray-600" />
+                <Label htmlFor="datastream-select" className="text-sm font-medium">
+                  数据流过滤:
+                </Label>
+              </div>
+              <Select
+                value={selectedDatastream}
+                onValueChange={handleDatastreamChange}
+              >
+                <SelectTrigger className="w-48" id="datastream-select">
+                  <SelectValue placeholder="选择数据流" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">所有数据流</SelectItem>
+                  {availableDatastreams.map((datastream) => (
+                    <SelectItem key={datastream} value={datastream}>
+                      {datastream}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDatastream !== "all" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDatastreamChange("all")}
+                >
+                  清除过滤
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs
           value={activeTab}

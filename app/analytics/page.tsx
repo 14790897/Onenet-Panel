@@ -49,6 +49,7 @@ export default function AnalyticsPage() {
     from: addDays(new Date(), -7),
     to: new Date(),
   })
+  const [dataInterval, setDataInterval] = useState<string>("auto") // 数据间隔
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
   
   const { savePreferences, loadPreferences, clearPreferences } = useAnalyticsPreferences()
