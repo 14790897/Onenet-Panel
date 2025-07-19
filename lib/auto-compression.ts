@@ -160,9 +160,9 @@ async function compressDataBefore(beforeTime: Date): Promise<{ compressedRows: n
       MIN(CAST(value AS NUMERIC)) as min_value,
       MAX(CAST(value AS NUMERIC)) as max_value,
       COUNT(*) as sample_count,
-      date_trunc('minute', created_at) + 
-      INTERVAL '5 minutes' * 
-      FLOOR(EXTRACT(minute FROM created_at) / 5) as time_bucket
+      -- 修复时间分桶：正确的5分钟对齐
+      date_trunc('hour', created_at) +
+      INTERVAL '5 minutes' * FLOOR(EXTRACT(minute FROM created_at) / 5) as time_bucket
     FROM onenet_data 
     WHERE created_at < ${beforeTime.toISOString()}
       AND created_at > ${new Date(beforeTime.getTime() - 60 * 60 * 1000).toISOString()} -- 只处理1小时内的数据

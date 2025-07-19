@@ -173,6 +173,72 @@ export default function AnalyticsPage() {
     }
   }
 
+  // 根据时间范围自动推荐数据间隔
+  const getRecommendedInterval = (startDate: Date, endDate: Date): string => {
+    const durationMs = endDate.getTime() - startDate.getTime()
+    const durationHours = durationMs / (1000 * 60 * 60)
+
+    if (durationHours <= 1) {
+      return "1m"
+    } else if (durationHours <= 6) {
+      return "5m"
+    } else if (durationHours <= 24) {
+      return "15m"
+    } else if (durationHours <= 168) { // 1周
+      return "1h"
+    } else if (durationHours <= 720) { // 1个月
+      return "3h"
+    } else {
+      return "1d"
+    }
+  }
+
+  // 处理时间范围变化
+  const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
+    setDateRange(newDateRange)
+
+    // 如果当前是自动模式，或者用户选择了新的时间范围，自动调整间隔
+    if (newDateRange?.from && newDateRange?.to) {
+      const recommendedInterval = getRecommendedInterval(newDateRange.from, newDateRange.to)
+
+      // 如果当前是自动模式，或者推荐的间隔与当前间隔差异很大，则自动更新
+      if (dataInterval === "auto" || shouldUpdateInterval(newDateRange.from, newDateRange.to, dataInterval)) {
+        setDataInterval(recommendedInterval)
+      }
+    }
+
+    // 保存偏好设置
+    savePreferences({
+      selectedDevices: selectedDevices.length > 0 ? selectedDevices : undefined,
+      selectedDatastream: selectedDatastream || undefined,
+      dateRange: newDateRange ? {
+        from: newDateRange.from?.toISOString() || '',
+        to: newDateRange.to?.toISOString() || ''
+      } : undefined
+    })
+  }
+
+  // 判断是否需要更新间隔
+  const shouldUpdateInterval = (startDate: Date, endDate: Date, currentInterval: string): boolean => {
+    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60)
+
+    // 如果时间范围很短但间隔很大，或者时间范围很长但间隔很小，则需要更新
+    if (durationHours <= 1 && !["1m", "5m"].includes(currentInterval)) {
+      return true
+    }
+    if (durationHours <= 6 && !["1m", "5m", "15m"].includes(currentInterval)) {
+      return true
+    }
+    if (durationHours <= 24 && !["5m", "15m", "30m", "1h"].includes(currentInterval)) {
+      return true
+    }
+    if (durationHours > 168 && ["1m", "5m"].includes(currentInterval)) {
+      return true
+    }
+
+    return false
+  }
+
   // 处理设备选择
   const handleDeviceSelect = (deviceId: string, checked: boolean) => {
     let newSelectedDevices;
@@ -182,7 +248,7 @@ export default function AnalyticsPage() {
       newSelectedDevices = selectedDevices.filter(id => id !== deviceId);
     }
     setSelectedDevices(newSelectedDevices);
-    
+
     // 保存偏好设置
     savePreferences({
       selectedDevices: newSelectedDevices.length > 0 ? newSelectedDevices : undefined,
@@ -306,7 +372,7 @@ export default function AnalyticsPage() {
               </Label>
               <DatePickerWithRange
                 date={dateRange}
-                onDateChange={setDateRange}
+                onDateChange={handleDateRangeChange}
               />
             </div>
 
@@ -360,8 +426,25 @@ export default function AnalyticsPage() {
                   <SelectItem value="1d">1天</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="text-xs text-gray-500">
-                选择较大间隔可提高图表性能，减少数据点数量
+              <div className="text-xs text-gray-500 space-y-1">
+                {dateRange?.from && dateRange?.to && (
+                  <div className="flex items-center justify-between">
+                    <span>
+                      当前时间范围: {Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24))} 天
+                    </span>
+                    {dataInterval !== "auto" && dateRange.from && dateRange.to && dataInterval !== getRecommendedInterval(dateRange.from, dateRange.to) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => dateRange.from && dateRange.to && setDataInterval(getRecommendedInterval(dateRange.from, dateRange.to))}
+                        className="text-xs h-6 px-2"
+                      >
+                        使用推荐间隔 ({getRecommendedInterval(dateRange.from, dateRange.to)})
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <div>选择较大间隔可提高图表性能，减少数据点数量</div>
               </div>
             </div>
 
@@ -435,7 +518,6 @@ export default function AnalyticsPage() {
               datastream={selectedDatastream}
               autoRefresh={true}
               refreshInterval={5000}
-              maxPoints={200}
             />
 
             {/* 历史数据分析 - 只有在有历史数据时显示 */}
