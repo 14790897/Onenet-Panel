@@ -37,6 +37,11 @@ export function RealtimeChart({
   const [currentMaxPoints, setCurrentMaxPoints] = useState(maxPoints)
   const [fetchLimit, setFetchLimit] = useState(50)
   const [timeRange, setTimeRange] = useState('1h')
+  const [dataTimeSpan, setDataTimeSpan] = useState<{ earliest: Date | null, latest: Date | null, count: number }>({
+    earliest: null,
+    latest: null,
+    count: 0
+  })
 
   const fetchLatestData = async () => {
     if (devices.length === 0) return
@@ -76,7 +81,23 @@ export function RealtimeChart({
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           )
 
-          return sorted.slice(-currentMaxPoints)
+          const limited = sorted.slice(-currentMaxPoints)
+
+          // 计算数据时间跨度
+          if (limited.length > 0) {
+            const timestamps = limited.map(item => new Date(item.timestamp))
+            const earliest = new Date(Math.min(...timestamps.map(t => t.getTime())))
+            const latest = new Date(Math.max(...timestamps.map(t => t.getTime())))
+            setDataTimeSpan({
+              earliest,
+              latest,
+              count: limited.length
+            })
+          } else {
+            setDataTimeSpan({ earliest: null, latest: null, count: 0 })
+          }
+
+          return limited
         })
 
         setLastUpdate(new Date())
@@ -152,6 +173,21 @@ export function RealtimeChart({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* 数据范围显示 */}
+            {dataTimeSpan.count > 0 && (
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <span>实际范围:</span>
+                <span>
+                  {dataTimeSpan.earliest && dataTimeSpan.latest && (
+                    <>
+                      {Math.round((dataTimeSpan.latest.getTime() - dataTimeSpan.earliest.getTime()) / (1000 * 60))}分钟
+                      ({dataTimeSpan.count}点)
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* 数据点数量选择器 */}
             <div className="flex items-center gap-2">
