@@ -15,29 +15,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    // 根据时间范围参数设置查询条件
-    let timeInterval = '1 hour'
+    // 根据时间范围参数计算开始时间
+    let startTime: Date
+    const now = new Date()
+
     switch (timeRange) {
       case '10m':
-        timeInterval = '10 minutes'
+        startTime = new Date(now.getTime() - 10 * 60 * 1000)
         break
       case '30m':
-        timeInterval = '30 minutes'
+        startTime = new Date(now.getTime() - 30 * 60 * 1000)
         break
       case '1h':
-        timeInterval = '1 hour'
+        startTime = new Date(now.getTime() - 60 * 60 * 1000)
         break
       case '6h':
-        timeInterval = '6 hours'
+        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000)
         break
       case '24h':
-        timeInterval = '24 hours'
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000)
         break
       case '7d':
-        timeInterval = '7 days'
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         break
       default:
-        timeInterval = '1 hour'
+        startTime = new Date(now.getTime() - 60 * 60 * 1000) // 默认1小时
     }
 
     // 获取指定时间范围内的数据
@@ -51,7 +53,7 @@ export async function GET(request: NextRequest) {
       FROM onenet_data
       WHERE device_id = ANY(${devices})
         AND datastream_id = ${datastream}
-        AND created_at >= NOW() - INTERVAL '${sql.unsafe(timeInterval)}'
+        AND created_at >= ${startTime.toISOString()}
       ORDER BY created_at DESC
       LIMIT ${limit * devices.length}
     `

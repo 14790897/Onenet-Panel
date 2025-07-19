@@ -93,6 +93,8 @@ export function RealtimeChart({
 
   useEffect(() => {
     if (devices.length > 0) {
+      // 清除旧数据，重新获取
+      setData([])
       fetchLatestData()
     }
   }, [devices, datastream, timeRange, fetchLimit])
