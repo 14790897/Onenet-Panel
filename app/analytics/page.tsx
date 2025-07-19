@@ -149,6 +149,7 @@ export default function AnalyticsPage() {
         datastream: selectedDatastream,
         start_date: dateRange.from.toISOString(),
         end_date: dateRange.to.toISOString(),
+        interval: dataInterval, // 添加数据间隔参数
       })
 
       const response = await fetch(`/api/analytics/comparison?${params}`)
@@ -244,7 +245,7 @@ export default function AnalyticsPage() {
     if (selectedDevices.length > 0 && selectedDatastream && dateRange?.from && dateRange?.to) {
       fetchComparisonData()
     }
-  }, [selectedDevices, selectedDatastream, dateRange])
+  }, [selectedDevices, selectedDatastream, dateRange, dataInterval])
 
   const allDatastreams = getAllDatastreams()
 
@@ -334,6 +335,34 @@ export default function AnalyticsPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* 数据间隔选择 */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                数据间隔
+              </Label>
+              <Select value={dataInterval} onValueChange={setDataInterval}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择数据间隔" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">自动 (智能采样)</SelectItem>
+                  <SelectItem value="1m">1分钟</SelectItem>
+                  <SelectItem value="5m">5分钟</SelectItem>
+                  <SelectItem value="15m">15分钟</SelectItem>
+                  <SelectItem value="30m">30分钟</SelectItem>
+                  <SelectItem value="1h">1小时</SelectItem>
+                  <SelectItem value="3h">3小时</SelectItem>
+                  <SelectItem value="6h">6小时</SelectItem>
+                  <SelectItem value="12h">12小时</SelectItem>
+                  <SelectItem value="1d">1天</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-gray-500">
+                选择较大间隔可提高图表性能，减少数据点数量
+              </div>
             </div>
 
             {/* 设备选择 */}
