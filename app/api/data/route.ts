@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getLatestData, getDataByDevice, getDataStats } from "@/lib/database"
+import { neon } from "@neondatabase/serverless"
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +34,6 @@ export async function GET(request: NextRequest) {
         let totalCount = undefined
         if (offset === 0) {
           try {
-            const { neon } = await import('@neondatabase/serverless')
             const sql = neon(process.env.DATABASE_URL!)
             let countQuery
             if (deviceId && datastream) {
