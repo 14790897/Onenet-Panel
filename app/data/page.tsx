@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RefreshCw, Database, TrendingUp, Activity, Settings, RotateCcw } from "lucide-react"
 import { SmartValueDisplay } from "@/components/smart-value-display"
+import { Pagination } from "@/components/pagination"
 import { useDataViewPreferences } from "@/lib/data-view-preferences"
 
 interface OneNetDataRecord {
@@ -24,7 +25,13 @@ export default function DataView() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("all")
+
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalItems, setTotalItems] = useState(0)
+  const [hasMore, setHasMore] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   const { savePreferences, loadPreferences, clearPreferences } =
@@ -44,14 +51,27 @@ export default function DataView() {
     setPreferencesLoaded(true);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (page = currentPage, size = pageSize) => {
     try {
       setLoading(true);
-      const response = await fetch("/api/data");
+      const offset = (page - 1) * size;
+      const params = new URLSearchParams({
+        type: 'paginated',
+        limit: size.toString(),
+        offset: offset.toString()
+      });
+
+      const response = await fetch(`/api/data?${params}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && Array.isArray(result.data)) {
           setData(result.data);
+          setHasMore(result.pagination?.hasMore || false);
+
+          // 如果API返回了总数，使用它
+          if (result.pagination?.totalCount !== undefined) {
+            setTotalItems(result.pagination.totalCount);
+          }
         } else {
           setData([]); // 确保始终为数组
           console.error("获取数据失败:", result.error || "数据格式错误");
@@ -82,14 +102,23 @@ export default function DataView() {
     }
   };
 
-  const fetchDeviceData = async (deviceId: string) => {
+  const fetchDeviceData = async (deviceId: string, page = 1, size = pageSize) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/data/device/${deviceId}`);
+      const offset = (page - 1) * size;
+      const params = new URLSearchParams({
+        type: 'device',
+        device_id: deviceId,
+        limit: size.toString(),
+        offset: offset.toString()
+      });
+
+      const response = await fetch(`/api/data?${params}`);
       if (response.ok) {
         const result = await response.json();
-        if (Array.isArray(result)) {
-          setData(result);
+        if (result.success && Array.isArray(result.data)) {
+          setData(result.data);
+          setHasMore(result.pagination?.hasMore || false);
         } else {
           setData([]); // 确保始终为数组
           console.error("获取设备数据失败: 数据格式错误");
@@ -106,14 +135,42 @@ export default function DataView() {
     }
   };
 
+  // 分页处理函数
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (activeTab === "all") {
+      fetchData(page, pageSize);
+    } else if (selectedDevice) {
+      fetchDeviceData(selectedDevice, page, pageSize);
+    }
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // 重置到第一页
+    if (activeTab === "all") {
+      fetchData(1, size);
+    } else if (selectedDevice) {
+      fetchDeviceData(selectedDevice, 1, size);
+    }
+  };
+
+  const refreshData = () => {
+    if (activeTab === "all") {
+      fetchData(currentPage, pageSize);
+    } else if (selectedDevice) {
+      fetchDeviceData(selectedDevice, currentPage, pageSize);
+    }
+  };
+
   useEffect(() => {
     // 等待偏好设置加载完成后再获取数据
     if (!preferencesLoaded) return;
 
     if (selectedDevice && activeTab === "device") {
-      fetchDeviceData(selectedDevice);
+      fetchDeviceData(selectedDevice, 1, pageSize);
     } else {
-      fetchData();
+      fetchData(1, pageSize);
     }
     fetchStats();
   }, [preferencesLoaded, selectedDevice, activeTab]);
@@ -131,7 +188,8 @@ export default function DataView() {
     clearPreferences();
     setSelectedDevice("");
     setActiveTab("all");
-    fetchData();
+    setCurrentPage(1);
+    fetchData(1, pageSize);
   };
 
   const uniqueDevices = Array.from(
@@ -139,7 +197,15 @@ export default function DataView() {
   );
 
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString("zh-CN");
+    return new Date(timestamp).toLocaleString("zh-CN", {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   const formatRawData = (rawData: any) => {
@@ -219,7 +285,7 @@ export default function DataView() {
               <RotateCcw className="w-4 h-4 mr-1" />
               重置
             </Button>
-            <Button onClick={fetchData} disabled={loading}>
+            <Button onClick={refreshData} disabled={loading}>
               <RefreshCw
                 className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
               />
@@ -389,6 +455,19 @@ export default function DataView() {
                     </table>
                   </div>
                 )}
+
+                {/* 分页组件 */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1}
+                  pageSize={pageSize}
+                  totalItems={totalItems}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  loading={loading}
+                  showPageSizeSelector={true}
+                  showInfo={true}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -407,11 +486,12 @@ export default function DataView() {
                     onClick={() => {
                       setSelectedDevice("");
                       setActiveTab("all");
+                      setCurrentPage(1);
                       savePreferences({
                         selectedDevice: undefined,
                         activeTab: "all",
                       });
-                      fetchData();
+                      fetchData(1, pageSize);
                     }}
                   >
                     所有设备
@@ -425,11 +505,12 @@ export default function DataView() {
                       size="sm"
                       onClick={() => {
                         setSelectedDevice(deviceId);
+                        setCurrentPage(1);
                         savePreferences({
                           selectedDevice: deviceId,
                           activeTab: "device",
                         });
-                        fetchDeviceData(deviceId);
+                        fetchDeviceData(deviceId, 1, pageSize);
                       }}
                     >
                       {deviceId}
@@ -480,6 +561,21 @@ export default function DataView() {
                       </div>
                     ))}
                   </div>
+                )}
+
+                {/* 设备数据分页组件 */}
+                {selectedDevice && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalItems > 0 ? Math.ceil(totalItems / pageSize) : 1}
+                    pageSize={pageSize}
+                    totalItems={totalItems}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                    loading={loading}
+                    showPageSizeSelector={true}
+                    showInfo={true}
+                  />
                 )}
               </CardContent>
             </Card>

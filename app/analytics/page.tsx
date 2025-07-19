@@ -405,7 +405,7 @@ export default function AnalyticsPage() {
               datastream={selectedDatastream}
               autoRefresh={true}
               refreshInterval={5000}
-              maxPoints={30}
+              maxPoints={200}
             />
 
             {/* 历史数据分析 - 只有在有历史数据时显示 */}
@@ -432,8 +432,20 @@ export default function AnalyticsPage() {
                             height={80}
                           />
                           <YAxis tick={{ fontSize: 12 }} />
-                          <Tooltip 
-                            labelFormatter={(value) => `时间: ${value}`}
+                          <Tooltip
+                            labelFormatter={(value) => {
+                              // 如果value是时间戳，格式化为本地时间
+                              if (typeof value === 'string' && value.includes('T')) {
+                                return `时间: ${new Date(value).toLocaleString('zh-CN', {
+                                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}`
+                              }
+                              return `时间: ${value}`
+                            }}
                             formatter={(value: any, name: string) => [
                               safeToFixed(value, 2),
                               devices.find(d => d.device_id === name)?.device_name || name

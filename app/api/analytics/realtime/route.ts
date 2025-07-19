@@ -8,24 +8,50 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const devices = searchParams.get('devices')?.split(',') || []
     const datastream = searchParams.get('datastream') || 'temperature'
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 1000) // 限制最大1000条
+    const timeRange = searchParams.get('timeRange') || '1h' // 默认1小时
 
     if (!devices.length) {
       return NextResponse.json([])
     }
 
-    // 获取最近的数据
+    // 根据时间范围参数设置查询条件
+    let timeInterval = '1 hour'
+    switch (timeRange) {
+      case '10m':
+        timeInterval = '10 minutes'
+        break
+      case '30m':
+        timeInterval = '30 minutes'
+        break
+      case '1h':
+        timeInterval = '1 hour'
+        break
+      case '6h':
+        timeInterval = '6 hours'
+        break
+      case '24h':
+        timeInterval = '24 hours'
+        break
+      case '7d':
+        timeInterval = '7 days'
+        break
+      default:
+        timeInterval = '1 hour'
+    }
+
+    // 获取指定时间范围内的数据
     const data = await sql`
-      SELECT 
+      SELECT
         device_id,
         datastream_id,
         value,
         created_at,
         raw_data->>'deviceName' as device_name
-      FROM onenet_data 
+      FROM onenet_data
       WHERE device_id = ANY(${devices})
         AND datastream_id = ${datastream}
-        AND created_at >= NOW() - INTERVAL '10 minutes'
+        AND created_at >= NOW() - INTERVAL '${sql.unsafe(timeInterval)}'
       ORDER BY created_at DESC
       LIMIT ${limit * devices.length}
     `
@@ -35,19 +61,15 @@ export async function GET(request: NextRequest) {
     
     data.forEach(row => {
       const timeKey = new Date(row.created_at).toISOString()
-      const timeDisplay = new Date(row.created_at).toLocaleTimeString('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-      
+
       if (!timeMap.has(timeKey)) {
         timeMap.set(timeKey, {
           timestamp: timeKey,
-          time: timeDisplay
+          // 不在服务器端格式化时间，让客户端处理
+          rawTimestamp: row.created_at
         })
       }
-      
+
       const timePoint = timeMap.get(timeKey)
       timePoint[row.device_id] = row.value
     })

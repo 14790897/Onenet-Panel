@@ -137,7 +137,15 @@ export default function OneNetDashboard() {
   }, []);
 
   const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString("zh-CN");
+    return new Date(timestamp).toLocaleString("zh-CN", {
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   // 获取用于显示的数值，确保返回数字类型
