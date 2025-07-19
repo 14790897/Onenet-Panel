@@ -35,21 +35,13 @@ function calculateSamplingStrategy(startDate: string, endDate: string, interval:
       maxPoints = 365
     }
   } else {
-    // 用户指定的间隔
-    const intervalMap: { [key: string]: { interval: string, maxPoints: number } } = {
-      '1m': { interval: 'minute', maxPoints: 60 },
-      '5m': { interval: 'minute', maxPoints: 288 },
-      '15m': { interval: 'minute', maxPoints: 96 },
-      '30m': { interval: 'minute', maxPoints: 48 },
-      '1h': { interval: 'hour', maxPoints: 24 },
-      '3h': { interval: 'hour', maxPoints: 8 },
-      '6h': { interval: 'hour', maxPoints: 4 },
-      '12h': { interval: 'hour', maxPoints: 2 },
-      '1d': { interval: 'day', maxPoints: 1 }
-    }
-    const config = intervalMap[interval] || { interval: 'hour', maxPoints: 100 }
-    samplingInterval = config.interval
-    maxPoints = config.maxPoints
+    // 用户指定的间隔 - 直接使用用户选择的间隔
+    samplingInterval = interval
+
+    // 根据间隔计算合理的最大数据点数
+    const durationMinutes = durationMs / (1000 * 60)
+    const intervalMinutes = getIntervalMinutes(interval)
+    maxPoints = Math.min(Math.ceil(durationMinutes / intervalMinutes), 1000) // 最多1000个点
   }
 
   return { samplingInterval, maxPoints }
@@ -85,6 +77,129 @@ function sampleData(data: any[], samplingInfo: { samplingInterval: string, maxPo
   return sampledData
 }
 
+// 数据库层面的时间间隔查询函数
+async function executeIntervalQuery(
+  devices: string[],
+  datastream: string,
+  startDate: string,
+  endDate: string,
+  samplingInfo: { samplingInterval: string, maxPoints: number }
+) {
+  const sql = neon(process.env.DATABASE_URL!)
+
+  // 根据间隔类型选择不同的查询策略
+  const interval = samplingInfo.samplingInterval
+
+  if (interval === '1m') {
+    // 1分钟间隔 - 使用date_trunc
+    return await sql`
+      SELECT
+        device_id,
+        datastream_id,
+        AVG(CAST(value AS NUMERIC)) as value,
+        date_trunc('minute', created_at) as time_bucket,
+        raw_data->>'deviceName' as device_name
+      FROM onenet_data
+      WHERE device_id = ANY(${devices})
+        AND datastream_id = ${datastream}
+        AND created_at BETWEEN ${startDate} AND ${endDate}
+      GROUP BY device_id, datastream_id, time_bucket, device_name
+      ORDER BY time_bucket ASC
+      LIMIT ${samplingInfo.maxPoints * devices.length}
+    `
+  } else if (['1h', '3h', '6h', '12h'].includes(interval)) {
+    // 小时级间隔 - 使用date_trunc到小时，然后按间隔分组
+    const hourInterval = parseInt(interval.replace('h', ''))
+    return await sql`
+      SELECT
+        device_id,
+        datastream_id,
+        AVG(CAST(value AS NUMERIC)) as value,
+        date_trunc('hour', created_at) +
+        INTERVAL '${sql.unsafe(hourInterval.toString())} hours' *
+        FLOOR(EXTRACT(hour FROM created_at) / ${hourInterval}) as time_bucket,
+        raw_data->>'deviceName' as device_name
+      FROM onenet_data
+      WHERE device_id = ANY(${devices})
+        AND datastream_id = ${datastream}
+        AND created_at BETWEEN ${startDate} AND ${endDate}
+      GROUP BY device_id, datastream_id, time_bucket, device_name
+      ORDER BY time_bucket ASC
+      LIMIT ${samplingInfo.maxPoints * devices.length}
+    `
+  } else if (interval === '1d') {
+    // 1天间隔 - 使用date_trunc
+    return await sql`
+      SELECT
+        device_id,
+        datastream_id,
+        AVG(CAST(value AS NUMERIC)) as value,
+        date_trunc('day', created_at) as time_bucket,
+        raw_data->>'deviceName' as device_name
+      FROM onenet_data
+      WHERE device_id = ANY(${devices})
+        AND datastream_id = ${datastream}
+        AND created_at BETWEEN ${startDate} AND ${endDate}
+      GROUP BY device_id, datastream_id, time_bucket, device_name
+      ORDER BY time_bucket ASC
+      LIMIT ${samplingInfo.maxPoints * devices.length}
+    `
+  } else if (['5m', '15m', '30m'].includes(interval)) {
+    // 分钟级自定义间隔
+    const minuteInterval = parseInt(interval.replace('m', ''))
+    return await sql`
+      SELECT
+        device_id,
+        datastream_id,
+        AVG(CAST(value AS NUMERIC)) as value,
+        date_trunc('hour', created_at) +
+        INTERVAL '${sql.unsafe(minuteInterval.toString())} minutes' *
+        FLOOR(EXTRACT(minute FROM created_at) / ${minuteInterval}) as time_bucket,
+        raw_data->>'deviceName' as device_name
+      FROM onenet_data
+      WHERE device_id = ANY(${devices})
+        AND datastream_id = ${datastream}
+        AND created_at BETWEEN ${startDate} AND ${endDate}
+      GROUP BY device_id, datastream_id, time_bucket, device_name
+      ORDER BY time_bucket ASC
+      LIMIT ${samplingInfo.maxPoints * devices.length}
+    `
+  } else {
+    // 自动模式或其他 - 使用小时级采样
+    return await sql`
+      SELECT
+        device_id,
+        datastream_id,
+        AVG(CAST(value AS NUMERIC)) as value,
+        date_trunc('hour', created_at) as time_bucket,
+        raw_data->>'deviceName' as device_name
+      FROM onenet_data
+      WHERE device_id = ANY(${devices})
+        AND datastream_id = ${datastream}
+        AND created_at BETWEEN ${startDate} AND ${endDate}
+      GROUP BY device_id, datastream_id, time_bucket, device_name
+      ORDER BY time_bucket ASC
+      LIMIT ${samplingInfo.maxPoints * devices.length}
+    `
+  }
+}
+
+// 获取间隔对应的分钟数（用于计算最大数据点数）
+function getIntervalMinutes(interval: string): number {
+  const intervalMap: { [key: string]: number } = {
+    '1m': 1,
+    '5m': 5,
+    '15m': 15,
+    '30m': 30,
+    '1h': 60,
+    '3h': 180,
+    '6h': 360,
+    '12h': 720,
+    '1d': 1440
+  }
+  return intervalMap[interval] || 60
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -104,24 +219,8 @@ export async function GET(request: NextRequest) {
     // 根据间隔和时间范围计算采样策略
     const samplingInfo = calculateSamplingStrategy(startDate, endDate, interval)
 
-    // 简化的采样查询 - 先获取所有数据，然后在应用层进行采样
-    const allData = await sql`
-      SELECT
-        device_id,
-        datastream_id,
-        CAST(value AS NUMERIC) as value,
-        created_at,
-        raw_data->>'deviceName' as device_name
-      FROM onenet_data
-      WHERE device_id = ANY(${devices})
-        AND datastream_id = ${datastream}
-        AND created_at BETWEEN ${startDate} AND ${endDate}
-      ORDER BY created_at ASC
-      LIMIT ${samplingInfo.maxPoints * 10}
-    `
-
-    // 在应用层进行采样
-    const data = sampleData(allData, samplingInfo)
+    // 数据库层面的时间间隔查询
+    const data = await executeIntervalQuery(devices, datastream, startDate, endDate, samplingInfo)
 
     // 按时间点组织数据
     const timeMap = new Map()
