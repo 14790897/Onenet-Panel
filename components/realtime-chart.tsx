@@ -55,8 +55,11 @@ export function RealtimeChart({
     return settings[timeRange as keyof typeof settings] || 200
   }
 
-  const fetchLatestData = async (clearExistingData = false) => {
+  const fetchLatestData = async (clearExistingData = false, retryCount = 0) => {
     if (devices.length === 0) return
+
+    const maxRetries = 3
+    const retryDelay = 1000 * (retryCount + 1) // 递增延迟
 
     try {
       setIsLoading(true)
@@ -69,12 +72,29 @@ export function RealtimeChart({
         timeRange: timeRange
       })
 
-      console.log('🔄 获取实时数据:', { devices, datastream, timeRange, limit: fetchLimit })
+      console.log('🔄 获取实时数据:', { devices, datastream, timeRange, limit: fetchLimit, retryCount })
 
       const response = await fetch(`/api/analytics/realtime?${params}`)
       if (response.ok) {
         const newData = await response.json()
         console.log('📊 获取到数据:', newData.length, '条记录')
+
+        // 添加详细的数据结构调试
+        if (newData.length > 0) {
+          console.log('🔍 数据结构示例:', {
+            firstItem: newData[0],
+            deviceKeys: Object.keys(newData[0]).filter(key => !['timestamp', 'rawTimestamp', 'dataSource', 'time'].includes(key)),
+            devices: devices,
+            expectedDevices: devices.length
+          })
+        } else if (retryCount < maxRetries) {
+          // 如果返回空数据且还有重试次数，则重试
+          console.log(`⚠️ 返回空数据，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries})`)
+          setTimeout(() => {
+            fetchLatestData(clearExistingData, retryCount + 1)
+          }, retryDelay)
+          return
+        }
 
         if (!Array.isArray(newData)) {
           throw new Error('API返回的数据格式不正确')
@@ -175,11 +195,31 @@ export function RealtimeChart({
       } else {
         const errorMsg = `API响应失败: ${response.status} ${response.statusText}`
         console.error('❌', errorMsg)
+
+        // 如果是服务器错误且还有重试次数，则重试
+        if (response.status >= 500 && retryCount < maxRetries) {
+          console.log(`⚠️ 服务器错误，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries}):`, errorMsg)
+          setTimeout(() => {
+            fetchLatestData(clearExistingData, retryCount + 1)
+          }, retryDelay)
+          return
+        }
+
         setError(errorMsg)
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '获取实时数据失败'
       console.error('❌ 获取实时数据失败:', error)
+
+      // 如果是网络错误且还有重试次数，则重试
+      if (retryCount < maxRetries && (error instanceof TypeError || errorMsg.includes('fetch'))) {
+        console.log(`⚠️ 网络错误，${retryDelay}ms后重试 (${retryCount + 1}/${maxRetries}):`, errorMsg)
+        setTimeout(() => {
+          fetchLatestData(clearExistingData, retryCount + 1)
+        }, retryDelay)
+        return
+      }
+
       setError(errorMsg)
     } finally {
       setIsLoading(false)

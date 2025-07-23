@@ -87,6 +87,16 @@ export async function GET(request: NextRequest) {
       .slice(0, limit)
       .reverse() // 重新排序为时间正序
 
+    // 添加调试日志，显示返回数据的结构
+    console.log('📊 实时图表数据结构示例:', {
+      totalPoints: chartData.length,
+      devices: devices,
+      sampleData: chartData.slice(0, 2).map(item => ({
+        timestamp: item.timestamp,
+        deviceKeys: Object.keys(item).filter(key => !['timestamp', 'rawTimestamp', 'dataSource'].includes(key))
+      }))
+    })
+
     return NextResponse.json(chartData)
   } catch (error) {
     console.error("获取实时数据失败:", error)
