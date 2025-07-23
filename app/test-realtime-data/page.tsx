@@ -12,16 +12,28 @@ export default function TestRealtimeDataPage() {
   const fetchData = async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
-      const response = await fetch('/api/analytics/realtime?devices=2457220437,2454063050&datastream=voc_ugm3&limit=10&timeRange=1h')
-      
+      // 使用更大的limit来确保获取到数据
+      const response = await fetch('/api/analytics/realtime?devices=2457220437,2454063050&datastream=voc_ugm3&limit=50&timeRange=1h')
+
+      console.log('🔄 发送请求:', {
+        url: '/api/analytics/realtime?devices=2457220437,2454063050&datastream=voc_ugm3&limit=50&timeRange=1h',
+        timestamp: new Date().toISOString()
+      })
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      console.log('🔍 实时数据API返回结果:', result)
+      console.log('🔍 实时数据API返回结果:', {
+        dataLength: result.length,
+        firstItem: result[0],
+        lastItem: result[result.length - 1],
+        deviceKeys: result.length > 0 ? Object.keys(result[0]).filter(key => !['timestamp', 'rawTimestamp', 'dataSource'].includes(key)) : [],
+        fullData: result
+      })
       setData(result)
     } catch (err) {
       console.error('❌ 获取数据失败:', err)

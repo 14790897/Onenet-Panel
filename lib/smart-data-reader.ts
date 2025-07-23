@@ -351,7 +351,7 @@ export class SmartDataReader {
       }))
     }
 
-    if (interval && ['1h', '3h', '6h', '12h'].includes(interval)) {
+    if (interval && ['1h', '2h', '3h', '6h', '12h'].includes(interval)) {
       const hourInterval = parseInt(interval.replace('h', ''))
       const data = await sql`
         SELECT

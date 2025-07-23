@@ -222,6 +222,7 @@ function getIntervalMinutes(interval: string): number {
     '15m': 15,
     '30m': 30,
     '1h': 60,
+    '2h': 120,
     '3h': 180,
     '6h': 360,
     '12h': 720,
