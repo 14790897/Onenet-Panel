@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { TrendingUp, Calendar, HardDrive, Filter, Download, RotateCcw } from "lucide-react"
 import { DateRange } from "react-day-picker"
 import { addDays } from "date-fns"
@@ -274,14 +274,7 @@ export default function AnalyticsPage() {
     return Array.from(datastreams)
   }
 
-  // 生成图表颜色
-  const getDeviceColor = (index: number) => {
-    const colors = [
-      '#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', 
-      '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
-    ]
-    return colors[index % colors.length]
-  }
+
 
   // 导出数据
   const exportData = () => {
@@ -530,63 +523,7 @@ export default function AnalyticsPage() {
             {/* 历史数据分析 - 只有在有历史数据时显示 */}
             {chartData.length > 0 && (
               <>
-                {/* 折线图 - 趋势对比 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>历史趋势对比图</CardTitle>
-                    <CardDescription>
-                      {selectedDatastream} - {selectedDevices.length} 个设备的历史数据趋势对比
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-96">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis 
-                            dataKey="time" 
-                            tick={{ fontSize: 12 }}
-                            angle={-45}
-                            textAnchor="end"
-                            height={80}
-                          />
-                          <YAxis tick={{ fontSize: 12 }} />
-                          <Tooltip
-                            labelFormatter={(value) => {
-                              // 如果value是时间戳，格式化为本地时间
-                              if (typeof value === 'string' && value.includes('T')) {
-                                return `时间: ${new Date(value).toLocaleString('zh-CN', {
-                                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}`
-                              }
-                              return `时间: ${value}`
-                            }}
-                            formatter={(value: any, name: string) => [
-                              safeToFixed(value, 2),
-                              devices.find(d => d.device_id === name)?.device_name || name
-                            ]}
-                          />
-                          <Legend />
-                          {selectedDevices.map((deviceId, index) => (
-                            <Line
-                              key={deviceId}
-                              type="monotone"
-                              dataKey={deviceId}
-                              stroke={getDeviceColor(index)}
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              name={devices.find(d => d.device_id === deviceId)?.device_name || deviceId}
-                            />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+
 
                 {/* 统计分析图表 */}
                 <Card>
