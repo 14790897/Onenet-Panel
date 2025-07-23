@@ -14,6 +14,7 @@ import { TrendingUp, Calendar, HardDrive, Filter, Download, RotateCcw } from "lu
 import { DateRange } from "react-day-picker"
 import { addDays } from "date-fns"
 import { RealtimeChart } from "@/components/realtime-chart"
+import { LongTermTrendChart } from "@/components/long-term-trend-chart"
 import { useAnalyticsPreferences } from "@/lib/analytics-preferences"
 
 interface DeviceData {
@@ -518,6 +519,12 @@ export default function AnalyticsPage() {
               datastream={selectedDatastream}
               autoRefresh={true}
               refreshInterval={5000}
+            />
+
+            {/* 长期趋势分析图表 */}
+            <LongTermTrendChart
+              devices={selectedDevices}
+              datastream={selectedDatastream}
             />
 
             {/* 历史数据分析 - 只有在有历史数据时显示 */}

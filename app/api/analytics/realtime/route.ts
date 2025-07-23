@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
 import { smartQueryDeviceData, getDataSourceInfo } from "@/lib/smart-data-reader"
-
-const sql = neon(process.env.DATABASE_URL!)
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +39,15 @@ export async function GET(request: NextRequest) {
       default:
         startTime = new Date(now.getTime() - 60 * 60 * 1000) // 默认1小时
     }
+
+    console.log('⏰ 实时数据API - 时间范围计算:', {
+      timeRange,
+      startTime: startTime.toISOString(),
+      endTime: now.toISOString(),
+      devices,
+      datastream,
+      limit
+    })
 
     // 使用智能数据读取器获取数据
     const data = await smartQueryDeviceData({

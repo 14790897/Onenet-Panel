@@ -39,6 +39,8 @@ export function RealtimeChart({
     latest: null,
     count: 0
   })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // 根据时间范围推荐获取限制
   const getRecommendedFetchLimit = (timeRange: string) => {
@@ -53,10 +55,13 @@ export function RealtimeChart({
     return settings[timeRange as keyof typeof settings] || 200
   }
 
-  const fetchLatestData = async () => {
+  const fetchLatestData = async (clearExistingData = false) => {
     if (devices.length === 0) return
 
     try {
+      setIsLoading(true)
+      setError(null)
+
       const params = new URLSearchParams({
         devices: devices.join(','),
         datastream,
@@ -64,23 +69,81 @@ export function RealtimeChart({
         timeRange: timeRange
       })
 
+      console.log('🔄 获取实时数据:', { devices, datastream, timeRange, limit: fetchLimit })
+
       const response = await fetch(`/api/analytics/realtime?${params}`)
       if (response.ok) {
         const newData = await response.json()
+        console.log('📊 获取到数据:', newData.length, '条记录')
+
+        if (!Array.isArray(newData)) {
+          throw new Error('API返回的数据格式不正确')
+        }
 
         setData(prevData => {
-          // 在客户端格式化时间显示
-          const processedNewData = newData.map((item: any) => ({
-            ...item,
-            time: new Date(item.timestamp).toLocaleTimeString('zh-CN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            })
-          }))
+          // 在客户端格式化时间显示，根据时间范围选择合适的格式
+          const processedNewData = newData.map((item: any) => {
+            const date = new Date(item.timestamp)
+            let timeFormat: string
 
-          // 合并新旧数据，保持时间顺序
+            // 根据时间范围选择合适的时间格式
+            if (timeRange === '7d' || timeRange === '24h') {
+              // 对于长时间范围，显示月日和小时
+              timeFormat = date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              })
+            } else if (timeRange === '6h') {
+              // 对于中等时间范围，显示小时分钟
+              timeFormat = date.toLocaleString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              })
+            } else {
+              // 对于短时间范围，显示时分秒
+              timeFormat = date.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              })
+            }
+
+            return {
+              ...item,
+              time: timeFormat
+            }
+          })
+
+          // 如果需要清除现有数据（时间范围变化时），直接使用新数据
+          if (clearExistingData) {
+            console.log('🧹 清除旧数据，使用新数据')
+            const sorted = processedNewData.sort((a: any, b: any) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            )
+
+            // 计算数据时间跨度
+            if (sorted.length > 0) {
+              const timestamps = sorted.map((item: RealtimeData) => new Date(item.timestamp))
+              const earliest = new Date(Math.min(...timestamps.map((t: Date) => t.getTime())))
+              const latest = new Date(Math.max(...timestamps.map((t: Date) => t.getTime())))
+              setDataTimeSpan({
+                earliest,
+                latest,
+                count: sorted.length
+              })
+            } else {
+              setDataTimeSpan({ earliest: null, latest: null, count: 0 })
+            }
+
+            return sorted
+          }
+
+          // 正常情况：合并新旧数据，保持时间顺序
           const combined = [...prevData, ...processedNewData]
           const unique = combined.filter((item, index, arr) =>
             arr.findIndex(t => t.timestamp === item.timestamp) === index
@@ -109,14 +172,23 @@ export function RealtimeChart({
         })
 
         setLastUpdate(new Date())
+      } else {
+        const errorMsg = `API响应失败: ${response.status} ${response.statusText}`
+        console.error('❌', errorMsg)
+        setError(errorMsg)
       }
     } catch (error) {
-      console.error('获取实时数据失败:', error)
+      const errorMsg = error instanceof Error ? error.message : '获取实时数据失败'
+      console.error('❌ 获取实时数据失败:', error)
+      setError(errorMsg)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // 处理时间范围变化
   const handleTimeRangeChange = (newTimeRange: string) => {
+    console.log('⏰ 时间范围变化:', timeRange, '->', newTimeRange)
     setTimeRange(newTimeRange)
 
     // 自动调整获取限制
@@ -125,6 +197,15 @@ export function RealtimeChart({
 
     // 清除旧数据，准备获取新数据
     setData([])
+    setDataTimeSpan({ earliest: null, latest: null, count: 0 })
+
+    // 立即获取新时间范围的数据
+    if (devices.length > 0) {
+      // 使用 setTimeout 确保状态更新完成后再获取数据
+      setTimeout(() => {
+        fetchLatestData(true) // 传入 true 表示清除现有数据
+      }, 100)
+    }
   }
 
   const clearData = () => {
@@ -140,11 +221,13 @@ export function RealtimeChart({
 
   useEffect(() => {
     if (devices.length > 0) {
+      console.log('🔄 设备或数据流变化，重新获取数据')
       // 清除旧数据，重新获取
       setData([])
-      fetchLatestData()
+      setDataTimeSpan({ earliest: null, latest: null, count: 0 })
+      fetchLatestData(true) // 传入 true 表示清除现有数据
     }
-  }, [devices, datastream, timeRange, fetchLimit])
+  }, [devices, datastream]) // 移除 timeRange 和 fetchLimit，因为它们有自己的处理逻辑
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -205,12 +288,29 @@ export function RealtimeChart({
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <span>实际范围:</span>
                 <span>
-                  {dataTimeSpan.earliest && dataTimeSpan.latest && (
-                    <>
-                      {Math.round((dataTimeSpan.latest.getTime() - dataTimeSpan.earliest.getTime()) / (1000 * 60))}分钟
-                      ({dataTimeSpan.count}点)
-                    </>
-                  )}
+                  {dataTimeSpan.earliest && dataTimeSpan.latest && (() => {
+                    const diffMs = dataTimeSpan.latest.getTime() - dataTimeSpan.earliest.getTime()
+                    const diffMinutes = Math.round(diffMs / (1000 * 60))
+                    const diffHours = Math.round(diffMs / (1000 * 60 * 60))
+                    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+                    let timeSpanText = ''
+                    if (diffDays > 0) {
+                      timeSpanText = `${diffDays}天`
+                      if (diffHours % 24 > 0) {
+                        timeSpanText += `${diffHours % 24}小时`
+                      }
+                    } else if (diffHours > 0) {
+                      timeSpanText = `${diffHours}小时`
+                      if (diffMinutes % 60 > 0) {
+                        timeSpanText += `${diffMinutes % 60}分钟`
+                      }
+                    } else {
+                      timeSpanText = `${diffMinutes}分钟`
+                    }
+
+                    return `${timeSpanText} (${dataTimeSpan.count}点)`
+                  })()}
                 </span>
               </div>
             )}
@@ -283,7 +383,29 @@ export function RealtimeChart({
         </div>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
+        {isLoading ? (
+          <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="text-center">
+              <div className="text-lg mb-2">加载中...</div>
+              <div className="text-sm">正在获取 {timeRange} 的数据</div>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="h-64 flex items-center justify-center text-red-500">
+            <div className="text-center">
+              <div className="text-lg mb-2">获取数据失败</div>
+              <div className="text-sm mb-4">{error}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchLatestData(true)}
+                disabled={isLoading}
+              >
+                重试
+              </Button>
+            </div>
+          </div>
+        ) : data.length === 0 ? (
           <div className="h-64 flex items-center justify-center text-gray-500">
             <div className="text-center">
               <div className="text-lg mb-2">无数据</div>
@@ -295,14 +417,42 @@ export function RealtimeChart({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="time" 
+                <XAxis
+                  dataKey="time"
                   tick={{ fontSize: 10 }}
-                  interval="preserveStartEnd"
+                  interval={(() => {
+                    // 根据时间范围和数据点数量动态调整显示间隔
+                    if (timeRange === '7d') {
+                      return Math.max(Math.floor(data.length / 10), 1) // 7天显示约10个标签
+                    } else if (timeRange === '24h') {
+                      return Math.max(Math.floor(data.length / 8), 1) // 24小时显示约8个标签
+                    } else if (timeRange === '6h') {
+                      return Math.max(Math.floor(data.length / 6), 1) // 6小时显示约6个标签
+                    } else {
+                      return "preserveStartEnd" // 短时间范围保持原有逻辑
+                    }
+                  })()}
+                  angle={timeRange === '7d' || timeRange === '24h' ? -45 : 0}
+                  textAnchor={timeRange === '7d' || timeRange === '24h' ? 'end' : 'middle'}
                 />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip 
-                  labelFormatter={(value) => `时间: ${value}`}
+                <Tooltip
+                  labelFormatter={(value, payload) => {
+                    // 从payload中获取完整的时间戳信息
+                    if (payload && payload.length > 0 && payload[0].payload.timestamp) {
+                      const fullDate = new Date(payload[0].payload.timestamp)
+                      return `时间: ${fullDate.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                      })}`
+                    }
+                    return `时间: ${value}`
+                  }}
                   formatter={(value: any, name: string) => [
                     typeof value === 'number' && !isNaN(value) ? value.toFixed(2) : value,
                     name
