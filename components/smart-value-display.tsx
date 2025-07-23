@@ -4,6 +4,151 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSmartValueColor, getColorDescription, getRelativePositionText } from '@/lib/value-color-utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+// 全局统计数据缓存
+const statsCache = new Map<string, {
+  data: any;
+  timestamp: number;
+  promise?: Promise<any>;
+}>();
+
+// 缓存有效期：5分钟
+const CACHE_DURATION = 5 * 60 * 1000;
+
+// 获取缓存键
+const getCacheKey = (deviceId: string, datastreamId: string) =>
+  `${deviceId}:${datastreamId}`;
+
+// 批量请求队列
+let batchQueue: Array<{
+  deviceId: string;
+  datastreamId: string;
+  resolve: (data: any) => void;
+  reject: (error: any) => void;
+}> = [];
+
+let batchTimeout: NodeJS.Timeout | null = null;
+
+// 批量处理统计请求
+const processBatch = async () => {
+  if (batchQueue.length === 0) return;
+
+  const currentBatch = [...batchQueue];
+  batchQueue = [];
+
+  try {
+    // 构建批量请求参数
+    const requests = currentBatch.map(item => ({
+      device_id: item.deviceId,
+      datastream_id: item.datastreamId
+    }));
+
+    const response = await fetch('/api/data/stats/batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
+        // 处理批量响应
+        currentBatch.forEach((item, index) => {
+          const stats = result.stats[index];
+          if (stats && stats.success) {
+            // 更新缓存
+            const cacheKey = getCacheKey(item.deviceId, item.datastreamId);
+            statsCache.set(cacheKey, {
+              data: stats.data,
+              timestamp: Date.now()
+            });
+            item.resolve(stats.data);
+          } else {
+            item.reject(new Error(stats?.error || 'Failed to fetch stats'));
+          }
+        });
+        return;
+      }
+    }
+
+    // 批量请求失败，回退到单个请求
+    currentBatch.forEach(item => {
+      fetchSingleStats(item.deviceId, item.datastreamId)
+        .then(item.resolve)
+        .catch(item.reject);
+    });
+  } catch (error) {
+    // 批量请求失败，回退到单个请求
+    currentBatch.forEach(item => {
+      fetchSingleStats(item.deviceId, item.datastreamId)
+        .then(item.resolve)
+        .catch(item.reject);
+    });
+  }
+};
+
+// 单个统计请求（回退方案）
+const fetchSingleStats = async (deviceId: string, datastreamId: string): Promise<any> => {
+  const response = await fetch(
+    `/api/data/stats?device_id=${encodeURIComponent(deviceId)}&datastream_id=${encodeURIComponent(datastreamId)}`
+  );
+
+  if (response.ok) {
+    const result = await response.json();
+    if (result.success) {
+      return result.stats;
+    }
+  }
+  throw new Error('Failed to fetch stats');
+};
+
+// 全局统计数据获取函数
+const getDatastreamStats = async (deviceId: string, datastreamId: string): Promise<any> => {
+  const cacheKey = getCacheKey(deviceId, datastreamId);
+  const now = Date.now();
+
+  // 检查缓存
+  const cached = statsCache.get(cacheKey);
+  if (cached) {
+    // 如果有正在进行的请求，等待它完成
+    if (cached.promise) {
+      return cached.promise;
+    }
+
+    // 如果缓存未过期，直接返回
+    if (now - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+  }
+
+  // 创建新的请求Promise
+  const promise = new Promise<any>((resolve, reject) => {
+    // 添加到批量队列
+    batchQueue.push({
+      deviceId,
+      datastreamId,
+      resolve,
+      reject
+    });
+
+    // 设置批量处理定时器（100ms内的请求会被批量处理）
+    if (batchTimeout) {
+      clearTimeout(batchTimeout);
+    }
+    batchTimeout = setTimeout(processBatch, 100);
+  });
+
+  // 缓存promise以避免重复请求
+  statsCache.set(cacheKey, {
+    data: cached?.data,
+    timestamp: cached?.timestamp || 0,
+    promise
+  });
+
+  return promise;
+};
+
 interface SmartValueDisplayProps {
   value: number;
   deviceId: string;
@@ -39,30 +184,17 @@ export function SmartValueDisplay({
     // 避免重复加载
     if (hasAttemptedLoad) return;
 
-    // 异步获取精确统计（节流：每个组件实例最多尝试一次）
+    // 异步获取精确统计（使用全局缓存）
     const fetchStats = async () => {
       setLoading(true);
       setHasAttemptedLoad(true);
-      
+
       try {
-        const response = await fetch(
-          `/api/data/stats?device_id=${encodeURIComponent(deviceId)}&datastream_id=${encodeURIComponent(datastreamId)}`,
-          { 
-            // 添加缓存控制，避免过度请求
-            cache: 'force-cache',
-            next: { revalidate: 300 } // 5分钟重新验证
-          }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setStats(data.stats);
-            // 使用新数据重新计算颜色
-            const newColor = getColorSync(value, deviceId, datastreamId);
-            setColorClass(newColor);
-          }
-        }
+        const statsData = await getDatastreamStats(deviceId, datastreamId);
+        setStats(statsData);
+        // 使用新数据重新计算颜色
+        const newColor = getColorSync(value, deviceId, datastreamId);
+        setColorClass(newColor);
       } catch (error) {
         // 静默失败，使用回退颜色
         console.debug('获取数据流统计失败，使用回退颜色:', error);
@@ -72,9 +204,9 @@ export function SmartValueDisplay({
     };
 
     // 延迟执行，避免同时发起太多请求
-    const timeoutId = setTimeout(fetchStats, Math.random() * 1000);
+    const timeoutId = setTimeout(fetchStats, Math.random() * 500); // 减少延迟时间
     return () => clearTimeout(timeoutId);
-  }, [deviceId, datastreamId, getColorSync, initialColor, hasAttemptedLoad]);
+  }, [deviceId, datastreamId, getColorSync, initialColor, hasAttemptedLoad, value]);
 
   const formatValue = (val: number): string => {
     // 安全的数值格式化
